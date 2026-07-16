@@ -1,0 +1,2 @@
+MODO = "ADMIN"
+#MODO = "LEITURA"

@@ -1,0 +1,422 @@
+[
+    {
+        "pauta": {
+            "id": 14,
+            "nome_pauta": "VANDER REVOADA CULTURAL",
+            "data_pauta": "30/05/2026",
+            "candidato": "Vander",
+            "descricao_inicial": "REVOADA CULTURAL , foi um evento de rua em campo grande ms, rimas, tendas de vendas, publico jovem.... vander enfatiza que sempre investiu e buscou recurso para a cultura, utiliza de exemplo o evento em questão para mostrar a importancia desse investimento...cultura envolve gastronomia, teatro musica, etc.",
+            "caminho_pasta": "D:/VANDER/AGENDA VANDER/2026-05-30 - VANDER REVOADA CULTURAL/BRUTO",
+            "data_criacao": "2026-06-23T12:30:14",
+            "data_atualizacao": "2026-06-24T13:18:00",
+            "excluida": 0,
+            "favorita": 1,
+            "status_pauta": "em_producao"
+        },
+        "takes": [
+            {
+                "id": 395,
+                "pauta_id": 14,
+                "nome_arquivo": "Nucleo20260530_3785.MP4",
+                "caminho_arquivo": "D:\\VANDER\\AGENDA VANDER\\2026-05-30 - VANDER REVOADA CULTURAL\\BRUTO\\Nucleo20260530_3785.MP4",
+                "comentario": "Evento de rua Revoada Cultural - Vander cumprimentando no evento",
+                "marcado_como_importante": 0,
+                "favorito": 0,
+                "tags": null,
+                "status_take": "talvez",
+                "_termo_busca": "cump"
+            },
+            {
+                "id": 406,
+                "pauta_id": 14,
+                "nome_arquivo": "Nucleo20260530_3796.MP4",
+                "caminho_arquivo": "D:\\VANDER\\AGENDA VANDER\\2026-05-30 - VANDER REVOADA CULTURAL\\BRUTO\\Nucleo20260530_3796.MP4",
+                "comentario": "Evento de rua Revoada Cultural - Vander cumprimentando pessoas no evento",
+                "marcado_como_importante": 0,
+                "favorito": 0,
+                "tags": null,
+                "status_take": "talvez",
+                "_termo_busca": "cump"
+            },
+            {
+                "id": 411,
+                "pauta_id": 14,
+                "nome_arquivo": "Nucleo20260530_3801.MP4",
+                "caminho_arquivo": "D:\\VANDER\\AGENDA VANDER\\2026-05-30 - VANDER REVOADA CULTURAL\\BRUTO\\Nucleo20260530_3801.MP4",
+                "comentario": "Evento de rua Revoada Cultural - Vander cumprimentando pessoas no evento",
+                "marcado_como_importante": 0,
+                "favorito": 0,
+                "tags": null,
+                "status_take": "talvez",
+                "_termo_busca": "cump"
+            },
+            {
+                "id": 412,
+                "pauta_id": 14,
+                "nome_arquivo": "Nucleo20260530_3802.MP4",
+                "caminho_arquivo": "D:\\VANDER\\AGENDA VANDER\\2026-05-30 - VANDER REVOADA CULTURAL\\BRUTO\\Nucleo20260530_3802.MP4",
+                "comentario": "Evento de rua Revoada Cultural - Vander cumprimentando pessoas no evento",
+                "marcado_como_importante": 0,
+                "favorito": 0,
+                "tags": null,
+                "status_take": "talvez",
+                "_termo_busca": "cump"
+            },
+            {
+                "id": 478,
+                "pauta_id": 14,
+                "nome_arquivo": "Nucleo20260530_3868.MP4",
+                "caminho_arquivo": "D:\\VANDER\\AGENDA VANDER\\2026-05-30 - VANDER REVOADA CULTURAL\\BRUTO\\Nucleo20260530_3868.MP4",
+                "comentario": "Evento de rua Revoada Cultural - Vander cumprimentando pessoas no evento",
+                "marcado_como_importante": 0,
+                "favorito": 0,
+                "tags": null,
+                "status_take": "talvez",
+                "_termo_busca": "cump"
+            }
+        ]
+    },
+    {
+        "pauta": {
+            "id": 31,
+            "nome_pauta": "VANDER BONITO AQUIDAUANA",
+            "data_pauta": "17/06/2026",
+            "candidato": "Vander",
+            "descricao_inicial": "caravana da Sudeco\nGravação do VT sobre a cultura de bonito\nconstrução de 80 unidades habitacionais",
+            "caminho_pasta": "D:/VANDER/AGENDA VANDER/2026-06-17 - VANDER BONITO AQUIDAUANA/cad2/PRIVATE/M4ROOT/CLIP",
+            "data_criacao": "2026-06-23T18:59:25",
+            "data_atualizacao": "2026-06-23T18:59:25",
+            "excluida": 0,
+            "favorita": 1,
+            "status_pauta": "finalizada"
+        },
+        "takes": [
+            {
+                "id": 1267,
+                "pauta_id": 31,
+                "nome_arquivo": "C049C049_260616RF.MP4",
+                "caminho_arquivo": "D:\\VANDER\\AGENDA VANDER\\2026-06-17 - VANDER BONITO AQUIDAUANA\\cad2\\PRIVATE\\M4ROOT\\CLIP\\C049C049_260616RF.MP4",
+                "comentario": "Feed Phil de Vander na caravana da sudeco cumprimentando",
+                "marcado_como_importante": 0,
+                "favorito": 0,
+                "tags": null,
+                "status_take": "talvez",
+                "_termo_busca": "cump"
+            },
+            {
+                "id": 1268,
+                "pauta_id": 31,
+                "nome_arquivo": "C049C050_260616RB.MP4",
+                "caminho_arquivo": "D:\\VANDER\\AGENDA VANDER\\2026-06-17 - VANDER BONITO AQUIDAUANA\\cad2\\PRIVATE\\M4ROOT\\CLIP\\C049C050_260616RB.MP4",
+                "comentario": "Feed Phil de Vander na caravana da sudeco cumprimentando / abraço",
+                "marcado_como_importante": 0,
+                "favorito": 0,
+                "tags": null,
+                "status_take": "talvez",
+                "_termo_busca": "cump"
+            },
+            {
+                "id": 1269,
+                "pauta_id": 31,
+                "nome_arquivo": "C049C051_260616UO.MP4",
+                "caminho_arquivo": "D:\\VANDER\\AGENDA VANDER\\2026-06-17 - VANDER BONITO AQUIDAUANA\\cad2\\PRIVATE\\M4ROOT\\CLIP\\C049C051_260616UO.MP4",
+                "comentario": "Feed Phil de Vander na caravana da sudeco cumprimentando / abraço",
+                "marcado_como_importante": 0,
+                "favorito": 0,
+                "tags": null,
+                "status_take": "talvez",
+                "_termo_busca": "cump"
+            },
+            {
+                "id": 1270,
+                "pauta_id": 31,
+                "nome_arquivo": "C049C052_260616KZ.MP4",
+                "caminho_arquivo": "D:\\VANDER\\AGENDA VANDER\\2026-06-17 - VANDER BONITO AQUIDAUANA\\cad2\\PRIVATE\\M4ROOT\\CLIP\\C049C052_260616KZ.MP4",
+                "comentario": "Feed Phil de Vander na caravana da sudeco cumprimentando / abraço",
+                "marcado_como_importante": 0,
+                "favorito": 0,
+                "tags": null,
+                "status_take": "talvez",
+                "_termo_busca": "cump"
+            },
+            {
+                "id": 1274,
+                "pauta_id": 31,
+                "nome_arquivo": "C049C056_260616AA.MP4",
+                "caminho_arquivo": "D:\\VANDER\\AGENDA VANDER\\2026-06-17 - VANDER BONITO AQUIDAUANA\\cad2\\PRIVATE\\M4ROOT\\CLIP\\C049C056_260616AA.MP4",
+                "comentario": "Feed Phil de Vander na caravana da sudeco cumprimentando / abraço",
+                "marcado_como_importante": 0,
+                "favorito": 0,
+                "tags": null,
+                "status_take": "talvez",
+                "_termo_busca": "cump"
+            },
+            {
+                "id": 1276,
+                "pauta_id": 31,
+                "nome_arquivo": "C049C058_260616OW.MP4",
+                "caminho_arquivo": "D:\\VANDER\\AGENDA VANDER\\2026-06-17 - VANDER BONITO AQUIDAUANA\\cad2\\PRIVATE\\M4ROOT\\CLIP\\C049C058_260616OW.MP4",
+                "comentario": "Feed Phil de Vander na caravana da sudeco cumprimentando / abraço",
+                "marcado_como_importante": 0,
+                "favorito": 0,
+                "tags": null,
+                "status_take": "talvez",
+                "_termo_busca": "cump"
+            },
+            {
+                "id": 1281,
+                "pauta_id": 31,
+                "nome_arquivo": "C049C063_260616YO.MP4",
+                "caminho_arquivo": "D:\\VANDER\\AGENDA VANDER\\2026-06-17 - VANDER BONITO AQUIDAUANA\\cad2\\PRIVATE\\M4ROOT\\CLIP\\C049C063_260616YO.MP4",
+                "comentario": "Feed Phil de Vander na caravana da sudeco cumprimentando / abraço",
+                "marcado_como_importante": 0,
+                "favorito": 0,
+                "tags": null,
+                "status_take": "talvez",
+                "_termo_busca": "cump"
+            },
+            {
+                "id": 1283,
+                "pauta_id": 31,
+                "nome_arquivo": "C049C065_260616TP.MP4",
+                "caminho_arquivo": "D:\\VANDER\\AGENDA VANDER\\2026-06-17 - VANDER BONITO AQUIDAUANA\\cad2\\PRIVATE\\M4ROOT\\CLIP\\C049C065_260616TP.MP4",
+                "comentario": "Feed Phil de Vander na caravana da sudeco cumprimentando",
+                "marcado_como_importante": 0,
+                "favorito": 0,
+                "tags": null,
+                "status_take": "talvez",
+                "_termo_busca": "cump"
+            },
+            {
+                "id": 1284,
+                "pauta_id": 31,
+                "nome_arquivo": "C049C066_260616VK.MP4",
+                "caminho_arquivo": "D:\\VANDER\\AGENDA VANDER\\2026-06-17 - VANDER BONITO AQUIDAUANA\\cad2\\PRIVATE\\M4ROOT\\CLIP\\C049C066_260616VK.MP4",
+                "comentario": "Feed Phil de Vander na caravana da sudeco cumprimentando / artesanato",
+                "marcado_como_importante": 0,
+                "favorito": 0,
+                "tags": null,
+                "status_take": "talvez",
+                "_termo_busca": "cump"
+            },
+            {
+                "id": 1288,
+                "pauta_id": 31,
+                "nome_arquivo": "C049C070_260616FQ.MP4",
+                "caminho_arquivo": "D:\\VANDER\\AGENDA VANDER\\2026-06-17 - VANDER BONITO AQUIDAUANA\\cad2\\PRIVATE\\M4ROOT\\CLIP\\C049C070_260616FQ.MP4",
+                "comentario": "Feed Phil de Vander na caravana da sudeco cumprimentando",
+                "marcado_como_importante": 0,
+                "favorito": 0,
+                "tags": null,
+                "status_take": "talvez",
+                "_termo_busca": "cump"
+            },
+            {
+                "id": 1290,
+                "pauta_id": 31,
+                "nome_arquivo": "C049C072_260616WU.MP4",
+                "caminho_arquivo": "D:\\VANDER\\AGENDA VANDER\\2026-06-17 - VANDER BONITO AQUIDAUANA\\cad2\\PRIVATE\\M4ROOT\\CLIP\\C049C072_260616WU.MP4",
+                "comentario": "Feed Phil de Vander na caravana da sudeco cumprimentando",
+                "marcado_como_importante": 0,
+                "favorito": 0,
+                "tags": null,
+                "status_take": "talvez",
+                "_termo_busca": "cump"
+            },
+            {
+                "id": 1291,
+                "pauta_id": 31,
+                "nome_arquivo": "C049C073_260616JG.MP4",
+                "caminho_arquivo": "D:\\VANDER\\AGENDA VANDER\\2026-06-17 - VANDER BONITO AQUIDAUANA\\cad2\\PRIVATE\\M4ROOT\\CLIP\\C049C073_260616JG.MP4",
+                "comentario": "Feed Phil de Vander na caravana da sudeco cumprimentando",
+                "marcado_como_importante": 0,
+                "favorito": 0,
+                "tags": null,
+                "status_take": "talvez",
+                "_termo_busca": "cump"
+            },
+            {
+                "id": 1292,
+                "pauta_id": 31,
+                "nome_arquivo": "C049C074_260616KO.MP4",
+                "caminho_arquivo": "D:\\VANDER\\AGENDA VANDER\\2026-06-17 - VANDER BONITO AQUIDAUANA\\cad2\\PRIVATE\\M4ROOT\\CLIP\\C049C074_260616KO.MP4",
+                "comentario": "Feed Phil de Vander na caravana da sudeco cumprimentando",
+                "marcado_como_importante": 0,
+                "favorito": 0,
+                "tags": null,
+                "status_take": "talvez",
+                "_termo_busca": "cump"
+            }
+        ]
+    },
+    {
+        "pauta": {
+            "id": 20,
+            "nome_pauta": "ENTREGA DE 9 UNIDADES ODONTOLOGICAS MOVEIS E EQUIPAMENTOS",
+            "data_pauta": "03/06/2026",
+            "candidato": "Vander",
+            "descricao_inicial": "ENTREGA DE 9 UNIDADES ODONTOLOGICAS MOVEIS E EQUIPAMENTOS\n\nEVENTO BIOPARQUE",
+            "caminho_pasta": "D:/VANDER/AGENDA VANDER/2026-06-03 - ENTREGA DE 9 UNIDADES ODONTOLOGICAS MOVEIS E EQUIPAMENTOS/PRIVATE/M4ROOT/CLIP",
+            "data_criacao": "2026-06-23T16:24:10",
+            "data_atualizacao": "2026-06-23T16:24:10",
+            "excluida": 0,
+            "favorita": 1,
+            "status_pauta": "finalizada"
+        },
+        "takes": [
+            {
+                "id": 878,
+                "pauta_id": 20,
+                "nome_arquivo": "Nucleo20260603_4236.MP4",
+                "caminho_arquivo": "D:\\VANDER\\AGENDA VANDER\\2026-06-03 - ENTREGA DE 9 UNIDADES ODONTOLOGICAS MOVEIS E EQUIPAMENTOS\\PRIVATE\\M4ROOT\\CLIP\\Nucleo20260603_4236.MP4",
+                "comentario": "UNIDADES ODONTOLOGICAS MOVEIS - Vander cumprimentando",
+                "marcado_como_importante": 0,
+                "favorito": 0,
+                "tags": null,
+                "status_take": "talvez",
+                "_termo_busca": "cump"
+            },
+            {
+                "id": 879,
+                "pauta_id": 20,
+                "nome_arquivo": "Nucleo20260603_4237.MP4",
+                "caminho_arquivo": "D:\\VANDER\\AGENDA VANDER\\2026-06-03 - ENTREGA DE 9 UNIDADES ODONTOLOGICAS MOVEIS E EQUIPAMENTOS\\PRIVATE\\M4ROOT\\CLIP\\Nucleo20260603_4237.MP4",
+                "comentario": "UNIDADES ODONTOLOGICAS MOVEIS - Vander cumprimentando",
+                "marcado_como_importante": 0,
+                "favorito": 0,
+                "tags": null,
+                "status_take": "talvez",
+                "_termo_busca": "cump"
+            },
+            {
+                "id": 880,
+                "pauta_id": 20,
+                "nome_arquivo": "Nucleo20260603_4238.MP4",
+                "caminho_arquivo": "D:\\VANDER\\AGENDA VANDER\\2026-06-03 - ENTREGA DE 9 UNIDADES ODONTOLOGICAS MOVEIS E EQUIPAMENTOS\\PRIVATE\\M4ROOT\\CLIP\\Nucleo20260603_4238.MP4",
+                "comentario": "UNIDADES ODONTOLOGICAS MOVEIS - Vander cumprimentando",
+                "marcado_como_importante": 0,
+                "favorito": 0,
+                "tags": null,
+                "status_take": "talvez",
+                "_termo_busca": "cump"
+            },
+            {
+                "id": 884,
+                "pauta_id": 20,
+                "nome_arquivo": "Nucleo20260603_4242.MP4",
+                "caminho_arquivo": "D:\\VANDER\\AGENDA VANDER\\2026-06-03 - ENTREGA DE 9 UNIDADES ODONTOLOGICAS MOVEIS E EQUIPAMENTOS\\PRIVATE\\M4ROOT\\CLIP\\Nucleo20260603_4242.MP4",
+                "comentario": "UNIDADES ODONTOLOGICAS MOVEIS - Vander cumprimentando",
+                "marcado_como_importante": 0,
+                "favorito": 0,
+                "tags": null,
+                "status_take": "talvez",
+                "_termo_busca": "cump"
+            },
+            {
+                "id": 891,
+                "pauta_id": 20,
+                "nome_arquivo": "Nucleo20260603_4249.MP4",
+                "caminho_arquivo": "D:\\VANDER\\AGENDA VANDER\\2026-06-03 - ENTREGA DE 9 UNIDADES ODONTOLOGICAS MOVEIS E EQUIPAMENTOS\\PRIVATE\\M4ROOT\\CLIP\\Nucleo20260603_4249.MP4",
+                "comentario": "UNIDADES ODONTOLOGICAS MOVEIS - cumprimentando pessoas do evento",
+                "marcado_como_importante": 0,
+                "favorito": 0,
+                "tags": null,
+                "status_take": "talvez",
+                "_termo_busca": "cump"
+            },
+            {
+                "id": 900,
+                "pauta_id": 20,
+                "nome_arquivo": "Nucleo20260603_4258.MP4",
+                "caminho_arquivo": "D:\\VANDER\\AGENDA VANDER\\2026-06-03 - ENTREGA DE 9 UNIDADES ODONTOLOGICAS MOVEIS E EQUIPAMENTOS\\PRIVATE\\M4ROOT\\CLIP\\Nucleo20260603_4258.MP4",
+                "comentario": "UNIDADES ODONTOLOGICAS MOVEIS - foto geral / vander cumprimentando",
+                "marcado_como_importante": 0,
+                "favorito": 0,
+                "tags": null,
+                "status_take": "talvez",
+                "_termo_busca": "cump"
+            }
+        ]
+    },
+    {
+        "pauta": {
+            "id": 17,
+            "nome_pauta": "AGENDA DOURADOS",
+            "data_pauta": "02/06/2026",
+            "candidato": "Vander",
+            "descricao_inicial": "contexto: vander foi adourados e realizou 5 pautas diferentes, as pautas foram divididas entre cartoes diferentes...\nesse é o cartão 3 do foca...\n\nPauta caminhões de coleta itaipu Dourados\n\nPauta reforma e revitalização do Parque victelio pellegrin\n\nPauta hospital mackenzie dourados\n\nPauta Hospital universitario",
+            "caminho_pasta": "D:/VANDER/AGENDA VANDER/2026-06-02 - AGENDA DOURADOS/BRUTO/CARDs FOCA/CARD3/PRIVATE/M4ROOT/CLIP",
+            "data_criacao": "2026-06-23T15:28:51",
+            "data_atualizacao": "2026-06-23T15:28:51",
+            "excluida": 0,
+            "favorita": 1,
+            "status_pauta": "finalizada"
+        },
+        "takes": [
+            {
+                "id": 620,
+                "pauta_id": 17,
+                "nome_arquivo": "Nucleo20260601_3939.MP4",
+                "caminho_arquivo": "D:\\VANDER\\AGENDA VANDER\\2026-06-02 - AGENDA DOURADOS\\BRUTO\\CARDs FOCA\\CARD3\\PRIVATE\\M4ROOT\\CLIP\\Nucleo20260601_3939.MP4",
+                "comentario": "Caminhões de coleta itaipu dourados - Vander cumprimentando trabalhadores da coleta",
+                "marcado_como_importante": 0,
+                "favorito": 0,
+                "tags": null,
+                "status_take": "talvez",
+                "_termo_busca": "cump"
+            },
+            {
+                "id": 749,
+                "pauta_id": 17,
+                "nome_arquivo": "Nucleo20260601_4068.MP4",
+                "caminho_arquivo": "D:\\VANDER\\AGENDA VANDER\\2026-06-02 - AGENDA DOURADOS\\BRUTO\\CARDs FOCA\\CARD3\\PRIVATE\\M4ROOT\\CLIP\\Nucleo20260601_4068.MP4",
+                "comentario": "Hospital universitario - Vander cumprimentando segurança no hospital",
+                "marcado_como_importante": 0,
+                "favorito": 1,
+                "tags": null,
+                "status_take": "talvez",
+                "_termo_busca": "cump"
+            },
+            {
+                "id": 765,
+                "pauta_id": 17,
+                "nome_arquivo": "Nucleo20260601_4084.MP4",
+                "caminho_arquivo": "D:\\VANDER\\AGENDA VANDER\\2026-06-02 - AGENDA DOURADOS\\BRUTO\\CARDs FOCA\\CARD3\\PRIVATE\\M4ROOT\\CLIP\\Nucleo20260601_4084.MP4",
+                "comentario": "Hospital universitario - cenas de apoio fachada hospital universitario / cumprimentando funcionaria de limpeza",
+                "marcado_como_importante": 0,
+                "favorito": 1,
+                "tags": null,
+                "status_take": "talvez",
+                "_termo_busca": "cump"
+            }
+        ]
+    },
+    {
+        "pauta": {
+            "id": 15,
+            "nome_pauta": "AGENDA DOURADOS",
+            "data_pauta": "02/06/2026",
+            "candidato": "Vander",
+            "descricao_inicial": "contexto: vander foi adourados e realizou 5 pautas diferentes, as pautas foram divididas entre cartoes diferentes...\nesse é o cartão 1 do emerson...\n\nPauta dos caminhões de coleta entregues em dourados, a empresa itaipu realizou a entrega, a participação do vander esta associada a conquista de valores do governo para investimento nessas areas especificas, como a area do saneamento basisco de dourados \n\nPauta da criação da avenida Via Parque do Córrego Paragem",
+            "caminho_pasta": "D:/VANDER/AGENDA VANDER/2026-06-02 - AGENDA DOURADOS/BRUTO/CARDs EMERSON/CARD1/PRIVATE/M4ROOT/CLIP",
+            "data_criacao": "2026-06-23T14:12:13",
+            "data_atualizacao": "2026-06-23T14:12:13",
+            "excluida": 0,
+            "favorita": 1,
+            "status_pauta": "finalizada"
+        },
+        "takes": [
+            {
+                "id": 522,
+                "pauta_id": 15,
+                "nome_arquivo": "C2983.MP4",
+                "caminho_arquivo": "D:\\VANDER\\AGENDA VANDER\\2026-06-02 - AGENDA DOURADOS\\BRUTO\\CARDs EMERSON\\CARD1\\PRIVATE\\M4ROOT\\CLIP\\C2983.MP4",
+                "comentario": "Caminhões de coleta itaipu dourados - Vander cehgando no local do evento e cumprimentando as pessoas",
+                "marcado_como_importante": 0,
+                "favorito": 0,
+                "tags": null,
+                "status_take": "talvez"
+            }
+        ]
+    }
+]

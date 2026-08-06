@@ -1,6 +1,8 @@
 import hashlib
 import json
 import os
+import threading
+import time
 from pathlib import Path
 
 import cv2
@@ -19,6 +21,9 @@ else:
 THUMB_DIR = CACHE_DIR / "thumbnails"
 INFO_DIR = CACHE_DIR / "video_info"
 
+CACHE_VERSION = "2"
+THUMB_SIZE = (320, 180)
+
 THUMB_DIR.mkdir(parents=True, exist_ok=True)
 INFO_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -32,6 +37,24 @@ VIDEO_EXTENSIONS = {
     ".wmv",
     ".m4v"
 }
+
+VIDEO_TIMEOUT_MS = 5000
+
+
+def _abrir_video(caminho: Path):
+    parametros = []
+    for propriedade in ("CAP_PROP_OPEN_TIMEOUT_MSEC", "CAP_PROP_READ_TIMEOUT_MSEC"):
+        valor = getattr(cv2, propriedade, None)
+        if valor is not None:
+            parametros.extend([valor, VIDEO_TIMEOUT_MS])
+
+    if parametros:
+        cap = cv2.VideoCapture(str(caminho), cv2.CAP_ANY, parametros)
+        if cap.isOpened():
+            return cap
+        cap.release()
+
+    return cv2.VideoCapture(str(caminho))
 
 
 def _gerar_identificador(caminho: Path):
@@ -53,9 +76,10 @@ def _gerar_identificador(caminho: Path):
         )
 
         assinatura = (
+            f"{CACHE_VERSION}|{THUMB_SIZE[0]}x{THUMB_SIZE[1]}|"
             f"{caminho_normalizado}|"
             f"{stat.st_size}|"
-            f"{stat.st_mtime_ns}"
+            f"{stat.st_mtime_ns}|{caminho.suffix.lower()}"
         )
 
         return hashlib.md5(
@@ -77,7 +101,9 @@ def _formatar_duracao(duracao):
 
 
 def _salvar_info(info_path: Path, info: dict):
-    arquivo_temporario = info_path.with_suffix(".tmp")
+    arquivo_temporario = info_path.with_name(
+        f"{info_path.stem}.{os.getpid()}.{threading.get_ident()}.tmp"
+    )
 
     try:
         arquivo_temporario.write_text(
@@ -199,7 +225,7 @@ def gerar_thumbnail(caminho_arquivo, segundo=2):
     ):
         return str(thumb_path)
 
-    cap = cv2.VideoCapture(str(caminho))
+    cap = _abrir_video(caminho)
 
     if not cap.isOpened():
         cap.release()
@@ -241,12 +267,13 @@ def gerar_thumbnail(caminho_arquivo, segundo=2):
 
         frame = cv2.resize(
             frame,
-            (320, 180),
+            THUMB_SIZE,
             interpolation=cv2.INTER_AREA
         )
 
         thumb_temporaria = thumb_path.with_name(
-            f"{thumb_path.stem}.tmp.jpg"
+            f"{thumb_path.stem}.{os.getpid()}."
+            f"{threading.get_ident()}.tmp.jpg"
         )
 
         gravou = cv2.imwrite(
@@ -302,7 +329,7 @@ def obter_info_video(caminho_arquivo):
         if info_cache:
             return info_cache
 
-    cap = cv2.VideoCapture(str(caminho))
+    cap = _abrir_video(caminho)
 
     if not cap.isOpened():
         cap.release()
@@ -324,3 +351,34 @@ def obter_info_video(caminho_arquivo):
 
 def obter_pasta_cache():
     return str(CACHE_DIR)
+
+
+def carregar_midia(caminho_arquivo):
+    """Carrega thumbnail e metadados, retornando métricas observáveis."""
+    inicio = time.perf_counter()
+    caminho = Path(caminho_arquivo)
+    thumb_path, info_path = _obter_caminhos_cache(caminho)
+
+    cache_hit = bool(
+        thumb_path
+        and info_path
+        and thumb_path.is_file()
+        and thumb_path.stat().st_size > 0
+        and info_path.is_file()
+        and _ler_info(info_path)
+    )
+
+    inicio_thumbnail = time.perf_counter()
+    thumbnail = gerar_thumbnail(caminho)
+    tempo_thumbnail = time.perf_counter() - inicio_thumbnail
+
+    inicio_info = time.perf_counter()
+    info = obter_info_video(caminho)
+    tempo_info = time.perf_counter() - inicio_info
+
+    return thumbnail, info, {
+        "cache_hit": cache_hit,
+        "tempo_thumbnail_ms": round(tempo_thumbnail * 1000, 2),
+        "tempo_info_ms": round(tempo_info * 1000, 2),
+        "tempo_total_ms": round((time.perf_counter() - inicio) * 1000, 2),
+    }

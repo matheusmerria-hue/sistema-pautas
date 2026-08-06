@@ -16,16 +16,11 @@ from database import (
     obter_historico_buscas,
     alternar_favorito_pauta
 )
-from thumbnailer import gerar_thumbnail, obter_info_video
-from PySide6.QtGui import QGuiApplication, QPixmap
+from PySide6.QtGui import QGuiApplication
 
 from PySide6.QtCore import (
      Qt,
      QTimer,
-     QObject,
-     Signal,
-     QRunnable,
-     QThreadPool,
      Slot
  )
 
@@ -35,13 +30,8 @@ from PySide6.QtCore import (
 
 from config import CANDIDATOS
 from exporter import exportar_resultados_json, exportar_resultados_csv
+from media_loader import MediaLoader
 from theme import GLOBAL_STYLE
-
-
-MEDIA_THREAD_POOL = QThreadPool.globalInstance()
-MEDIA_THREAD_POOL.setMaxThreadCount(2)
-
-
 
 class SearchPautaWindow(QWidget):
     def __init__(self):
@@ -52,6 +42,8 @@ class SearchPautaWindow(QWidget):
 
         self.main_layout = QVBoxLayout(self)
         self.resultados_exportaveis = []
+        self.media_loader = MediaLoader(self)
+        self.media_generation = self.media_loader.generation
         self.search_timer = QTimer(self)
         self.search_timer.setSingleShot(True)
         self.search_timer.setInterval(500)
@@ -62,6 +54,10 @@ class SearchPautaWindow(QWidget):
         self.criar_area_resultados()
         self.aplicar_estilo()
         self.atualizar_historico()
+
+    def closeEvent(self, event):
+        self.media_loader.encerrar()
+        super().closeEvent(event)
 
     def criar_cabecalho(self):
         title = QLabel("Buscar pautas")
@@ -227,6 +223,8 @@ class SearchPautaWindow(QWidget):
 
 
     def carregar_resultados(self, resultados):
+        self.media_generation = self.media_loader.nova_geracao()
+
         while self.scroll_layout.count():
             item = self.scroll_layout.takeAt(0)
             if item.widget():
@@ -254,7 +252,9 @@ class SearchPautaWindow(QWidget):
                 takes=item["takes"],
                 somente_comentados=self.check_somente_comentados.isChecked(),
                 somente_favoritos=self.check_somente_favoritos.isChecked(),
-                palavra_chave=palavra
+                palavra_chave=palavra,
+                media_loader=self.media_loader,
+                media_generation=self.media_generation
             )
 
             if card.sem_takes_visiveis:
@@ -394,7 +394,9 @@ class PautaCard(QFrame):
         takes,
         somente_comentados=True,
         somente_favoritos=False,
-        palavra_chave=""
+        palavra_chave="",
+        media_loader=None,
+        media_generation=0
     ):
         super().__init__()
 
@@ -403,6 +405,8 @@ class PautaCard(QFrame):
         self.somente_comentados = somente_comentados
         self.somente_favoritos = somente_favoritos
         self.palavra_chave = palavra_chave.lower().strip()
+        self.media_loader = media_loader
+        self.media_generation = media_generation
 
         self.takes_visiveis = []
         self.total_takes_visiveis = 0
@@ -597,7 +601,11 @@ class PautaCard(QFrame):
                     self.palavra_chave
                 )
 
-                row = TakeRow(take)
+                row = TakeRow(
+                    take,
+                    self.media_loader,
+                    self.media_generation
+                )
                 detalhes_layout.addWidget(row)
 
         self.detalhes_criados = True
@@ -684,11 +692,13 @@ class PautaCard(QFrame):
 
 
 class TakeRow(QFrame):
-    def __init__(self, take):
+    def __init__(self, take, media_loader, media_generation):
         super().__init__()
 
         self.take = take
-        self.media_worker = None
+        self.media_loader = media_loader
+        self.media_generation = media_generation
+        self.media_solicitada = False
 
         self.setObjectName("TakeRow")
         self.setCursor(Qt.PointingHandCursor)
@@ -955,56 +965,41 @@ class TakeRow(QFrame):
             self.abrir_popup
         )
 
-        # Toda a interface da linha já foi criada.
-        # Agora a mídia começa a carregar em segundo plano.
-        self.iniciar_carregamento_midia()
+        # A mídia só é solicitada quando a linha realmente for pintada.
 
 
     def iniciar_carregamento_midia(self):
+        if self.media_solicitada or self.media_loader is None:
+            return
+
+        self.media_solicitada = True
         caminho = self.take.get(
             "caminho_arquivo",
             ""
         )
 
-        self.media_worker = MediaWorker(
-            caminho
-        )
-
-        self.media_worker.signals.concluido.connect(
-            self.aplicar_midia
-        )
-
-        self.media_worker.signals.falhou.connect(
-            self.aplicar_erro_midia
-        )
-
-        MEDIA_THREAD_POOL.start(
-            self.media_worker
+        self.media_loader.solicitar(
+            caminho,
+            self,
+            self.media_generation
         )
 
 
-    @Slot(str, object)
+    def paintEvent(self, event):
+        self.iniciar_carregamento_midia()
+        super().paintEvent(event)
+
+
+    @Slot(object, object)
     def aplicar_midia(
         self,
-        thumb_path,
+        pixmap,
         info_video
     ):
-        if thumb_path:
-            pixmap = QPixmap(
-                thumb_path
-            )
-
+        if pixmap is not None:
             if not pixmap.isNull():
                 self.thumb_label.setText("")
-
-                self.thumb_label.setPixmap(
-                    pixmap.scaled(
-                        190,
-                        107,
-                        Qt.KeepAspectRatio,
-                        Qt.SmoothTransformation
-                    )
-                )
+                self.thumb_label.setPixmap(pixmap)
             else:
                 self.mostrar_sem_thumbnail()
         else:
@@ -1021,9 +1016,6 @@ class TakeRow(QFrame):
                 "⏱ Duração indisponível"
             )
 
-        self.media_worker = None
-
-
     @Slot(str)
     def aplicar_erro_midia(
         self,
@@ -1034,9 +1026,6 @@ class TakeRow(QFrame):
         self.detalhes_video.setText(
             "⏱ Informações indisponíveis"
         )
-
-        self.media_worker = None
-
 
     def mostrar_sem_thumbnail(self):
         self.thumb_label.clear()
@@ -1170,45 +1159,6 @@ class TakeRow(QFrame):
                 "O caminho deste arquivo "
                 "não existe mais."
             )
-
-
-class MediaWorkerSignals(QObject):
-    concluido = Signal(str, object)
-    falhou = Signal(str)
-
-
-class MediaWorker(QRunnable):
-    def __init__(self, caminho_arquivo):
-        super().__init__()
-
-        self.caminho_arquivo = caminho_arquivo
-        self.signals = MediaWorkerSignals()
-
-        self.setAutoDelete(True)
-
-
-    @Slot()
-    def run(self):
-        try:
-            thumb_path = gerar_thumbnail(
-                self.caminho_arquivo
-            )
-
-            info_video = obter_info_video(
-                self.caminho_arquivo
-            )
-
-            self.signals.concluido.emit(
-                thumb_path or "",
-                info_video
-            )
-
-        except Exception as erro:
-            self.signals.falhou.emit(
-                str(erro)
-            )
-
-
 
 
 class TakePopup(QDialog):

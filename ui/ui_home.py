@@ -17,7 +17,7 @@ from ui.ui_create import CreatePautaWindow
 from ui.ui_search import SearchPautaWindow
 from user_config import MODO
 from theme import GLOBAL_STYLE, APP_VERSION, APP_SUBTITLE, APP_TEAM
-from database import obter_estatisticas, obter_top_palavras, listar_pautas_acervo,atualizar_status_pauta
+from database import listar_pautas_acervo, atualizar_status_pauta
 from config import CANDIDATOS
 from PySide6.QtGui import QIcon
 
@@ -444,14 +444,6 @@ class HomeWindow(QMainWindow):
                 "Erro ao exportar",
                 f"Não foi possível exportar os dados:\n\n{erro}"
             )
-
-    def selecionar_filtro_acervo(self, selecionado):
-        self.filtro_acervo_atual = selecionado
-
-        self.dashboard_page.deleteLater()
-        self.dashboard_page = self.criar_dashboard_page()
-        self.pages.insertWidget(0, self.dashboard_page)
-        self.pages.setCurrentWidget(self.dashboard_page)
 
     def configurar_botao_sidebar(self, botao, texto, icone):
         botao.setText(texto)

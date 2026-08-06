@@ -8,6 +8,7 @@ from PySide6.QtCore import Qt
 from config import CANDIDATOS
 from file_scanner import listar_arquivos_midia
 from database import salvar_pauta
+from theme import GLOBAL_STYLE
 import os
 import re
 
@@ -255,5 +256,4 @@ class CreatePautaWindow(QWidget):
                 self.input_descricao.setPlainText(descricao)
 
     def aplicar_estilo(self):
-        from theme import GLOBAL_STYLE
         self.setStyleSheet(GLOBAL_STYLE)

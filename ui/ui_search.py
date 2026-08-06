@@ -1,5 +1,6 @@
 import os
 import html
+import re
 
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
@@ -32,12 +33,9 @@ from PySide6.QtCore import (
 
 
 
-from PySide6.QtGui import QGuiApplication, QPixmap
-
 from config import CANDIDATOS
-from database import buscar_pautas, excluir_pauta, atualizar_pauta, alternar_favorito_take
-
 from exporter import exportar_resultados_json, exportar_resultados_csv
+from theme import GLOBAL_STYLE
 
 
 MEDIA_THREAD_POOL = QThreadPool.globalInstance()
@@ -64,9 +62,6 @@ class SearchPautaWindow(QWidget):
         self.criar_area_resultados()
         self.aplicar_estilo()
         self.atualizar_historico()
-
-    def executar_busca_instantanea(self):
-        self.executar_busca(salvar_no_historico=False)
 
     def criar_cabecalho(self):
         title = QLabel("Buscar pautas")
@@ -118,7 +113,7 @@ class SearchPautaWindow(QWidget):
         self.check_somente_pautas_favoritas.stateChanged.connect(self.agendar_busca)
 
         self.btn_buscar = QPushButton("Buscar")
-        self.btn_buscar.clicked.connect(self.executar_busca)
+        self.btn_buscar.clicked.connect(lambda: self.executar_busca())
 
         self.btn_exportar_resultado = QPushButton("Exportar resultado")
         self.btn_exportar_resultado.setObjectName("SecondaryButton")
@@ -204,28 +199,31 @@ class SearchPautaWindow(QWidget):
         self.btn_buscar.setText("Buscando...")
         self.btn_buscar.setEnabled(False)
 
-        palavra = self.input_palavra.text().strip()
+        try:
+            palavra = self.input_palavra.text().strip()
 
-        if salvar_no_historico and palavra:
-            salvar_busca(palavra)
+            if salvar_no_historico and palavra:
+                salvar_busca(palavra)
 
-        data_inicial = self.input_data_inicial.text().strip()
-        data_final = self.input_data_final.text().strip()
-        candidato = self.combo_candidato.currentText()
+            resultados = buscar_pautas(
+                palavra_chave=palavra,
+                data_inicial=self.input_data_inicial.text().strip(),
+                data_final=self.input_data_final.text().strip(),
+                candidato=self.combo_candidato.currentText(),
+                somente_pautas_favoritas=self.check_somente_pautas_favoritas.isChecked()
+            )
 
-        resultados = buscar_pautas(
-            palavra_chave=palavra,
-            data_inicial=data_inicial,
-            data_final=data_final,
-            candidato=candidato,
-            somente_pautas_favoritas=self.check_somente_pautas_favoritas.isChecked()
-        )
-
-        self.carregar_resultados(resultados)
-        self.atualizar_historico()
-
-        self.btn_buscar.setText("Buscar")
-        self.btn_buscar.setEnabled(True)
+            self.carregar_resultados(resultados)
+            self.atualizar_historico()
+        except Exception as erro:
+            QMessageBox.critical(
+                self,
+                "Erro na busca",
+                f"Não foi possível concluir a busca:\n\n{erro}"
+            )
+        finally:
+            self.btn_buscar.setText("Buscar")
+            self.btn_buscar.setEnabled(True)
 
 
     def carregar_resultados(self, resultados):
@@ -293,7 +291,6 @@ class SearchPautaWindow(QWidget):
 
 
     def aplicar_estilo(self):
-        from theme import GLOBAL_STYLE
         self.setStyleSheet(GLOBAL_STYLE)
     
 
@@ -371,6 +368,7 @@ class SearchPautaWindow(QWidget):
 
     def reutilizar_busca(self, termo):
         self.input_palavra.setText(termo)
+        self.search_timer.stop()
         self.executar_busca()
 
     def alternar_historico(self):
@@ -380,11 +378,6 @@ class SearchPautaWindow(QWidget):
         self.btn_toggle_historico.setText(
             "▲ Últimas buscas" if aberto else "▼ Últimas buscas"
         )
-
-    def agendar_busca(self):
-        self.search_timer.start()
-
-
 
     def agendar_busca(self):
         self.search_timer.start()
@@ -1138,8 +1131,6 @@ class TakeRow(QFrame):
         termo_seguro = html.escape(
             termo
         )
-
-        import re
 
         padrao = re.compile(
             re.escape(

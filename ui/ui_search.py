@@ -5,7 +5,7 @@ import re
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
     QPushButton, QComboBox, QScrollArea, QFrame, QCheckBox,
-    QMessageBox, QDialog, QTextEdit, QFileDialog, QToolButton
+    QMessageBox, QDialog, QTextEdit, QFileDialog, QToolButton, QLayout
 )
 from database import (
     buscar_pautas,
@@ -31,7 +31,7 @@ from PySide6.QtCore import (
 from config import CANDIDATOS
 from exporter import exportar_resultados_json, exportar_resultados_csv
 from media_loader import MediaLoader
-from theme import GLOBAL_STYLE
+from theme import GLOBAL_STYLE, SPACING
 
 class SearchPautaWindow(QWidget):
     def __init__(self):
@@ -41,6 +41,9 @@ class SearchPautaWindow(QWidget):
         self.resize(1100, 750)
 
         self.main_layout = QVBoxLayout(self)
+        self.main_layout.setSizeConstraint(QLayout.SetNoConstraint)
+        self.main_layout.setContentsMargins(SPACING["xxl"], SPACING["xl"], SPACING["xxl"], SPACING["xl"])
+        self.main_layout.setSpacing(SPACING["md"])
         self.resultados_exportaveis = []
         self.media_loader = MediaLoader(self)
         self.media_generation = self.media_loader.generation
@@ -61,11 +64,10 @@ class SearchPautaWindow(QWidget):
 
     def criar_cabecalho(self):
         title = QLabel("Buscar pautas")
-        title.setAlignment(Qt.AlignCenter)
-        title.setStyleSheet("font-size: 30px; font-weight: bold;")
+        title.setObjectName("PageTitle")
 
         subtitle = QLabel("Busque por pauta, candidato, data, arquivo ou comentário dos takes.")
-        subtitle.setAlignment(Qt.AlignCenter)
+        subtitle.setObjectName("PageSubtitle")
 
         self.main_layout.addWidget(title)
         self.main_layout.addWidget(subtitle)
@@ -75,11 +77,13 @@ class SearchPautaWindow(QWidget):
         card.setObjectName("Card")
 
         layout = QVBoxLayout(card)
+        layout.setContentsMargins(20, 18, 20, 18)
+        layout.setSpacing(12)
 
         linha_1 = QHBoxLayout()
 
         self.input_palavra = QLineEdit()
-        self.input_palavra.setPlaceholderText("Palavra-chave. Ex: saúde, educação, hospital...")
+        self.input_palavra.setPlaceholderText("Palavra-chave")
         self.input_palavra.textChanged.connect(self.agendar_busca)
 
         self.combo_candidato = QComboBox()
@@ -90,12 +94,19 @@ class SearchPautaWindow(QWidget):
         linha_1.addWidget(self.combo_candidato, stretch=1)
 
         linha_2 = QHBoxLayout()
+        linha_2.setSpacing(12)
+
+        linha_opcoes = QVBoxLayout()
+        linha_opcoes.setSpacing(8)
+
+        linha_acoes = QHBoxLayout()
+        linha_acoes.setSpacing(10)
 
         self.input_data_inicial = QLineEdit()
-        self.input_data_inicial.setPlaceholderText("Data inicial. Ex: 2026-06-01")
+        self.input_data_inicial.setPlaceholderText("Data inicial (AAAA-MM-DD)")
 
         self.input_data_final = QLineEdit()
-        self.input_data_final.setPlaceholderText("Data final. Ex: 2026-06-30")
+        self.input_data_final.setPlaceholderText("Data final (AAAA-MM-DD)")
 
         self.check_somente_comentados = QCheckBox("Mostrar somente takes comentados")
         self.check_somente_favoritos = QCheckBox("Mostrar somente takes favoritos")
@@ -118,14 +129,17 @@ class SearchPautaWindow(QWidget):
 
         linha_2.addWidget(self.input_data_inicial)
         linha_2.addWidget(self.input_data_final)
-        linha_2.addWidget(self.check_somente_comentados)
-        linha_2.addWidget(self.check_somente_favoritos)
-        linha_2.addWidget(self.check_somente_pautas_favoritas)
-        linha_2.addWidget(self.btn_buscar)
-        linha_2.addWidget(self.btn_exportar_resultado)
+        linha_opcoes.addWidget(self.check_somente_comentados)
+        linha_opcoes.addWidget(self.check_somente_favoritos)
+        linha_opcoes.addWidget(self.check_somente_pautas_favoritas)
+        linha_acoes.addStretch()
+        linha_acoes.addWidget(self.btn_buscar)
+        linha_acoes.addWidget(self.btn_exportar_resultado)
 
         layout.addLayout(linha_1)
         layout.addLayout(linha_2)
+        layout.addLayout(linha_opcoes)
+        layout.addLayout(linha_acoes)
 
         self.card_historico = QFrame()
         self.card_historico.setObjectName("Card")
@@ -179,8 +193,8 @@ class SearchPautaWindow(QWidget):
         self.scroll_content.setObjectName("SearchResultsArea")
 
         self.scroll_layout = QVBoxLayout(self.scroll_content)
-        self.scroll_layout.setContentsMargins(8, 10, 8, 0)
-        self.scroll_layout.setSpacing(18)
+        self.scroll_layout.setContentsMargins(2, 10, 8, 0)
+        self.scroll_layout.setSpacing(14)
 
         self.scroll_area.setWidget(self.scroll_content)
 
@@ -1203,27 +1217,7 @@ class TakePopup(QDialog):
         layout.addWidget(caminho)
         layout.addLayout(botoes)
         
-        self.setStyleSheet("""
-            QDialog {
-                background-color: #121212;
-                color: white;
-            }
-
-            QTextEdit {
-                background-color: #2a2a2a;
-                color: white;
-                border-radius: 8px;
-                padding: 10px;
-            }
-
-            QPushButton {
-                background-color: #2d6cdf;
-                color: white;
-                border-radius: 9px;
-                padding: 10px;
-                font-weight: bold;
-            }
-        """)
+        self.setStyleSheet(GLOBAL_STYLE)
 
     def copiar_caminho(self):
         clipboard = QGuiApplication.clipboard()
@@ -1352,38 +1346,7 @@ class EditPautaPopup(QDialog):
 
         layout.addWidget(btn_salvar)
 
-        self.setStyleSheet("""
-            QDialog {
-                background-color: #121212;
-                color: white;
-            }
-
-            QLineEdit, QTextEdit, QComboBox {
-                background-color: #2a2a2a;
-                color: white;
-                border: 1px solid #444;
-                border-radius: 8px;
-                padding: 10px;
-            }
-
-            QPushButton {
-                background-color: #2d6cdf;
-                color: white;
-                border-radius: 9px;
-                padding: 10px;
-                font-weight: bold;
-            }
-
-            QFrame#TakeRow {
-                background-color: #1e1e1e;
-                border-radius: 8px;
-                margin: 4px;
-            }
-
-            QScrollArea {
-                border: none;
-            }
-        """)
+        self.setStyleSheet(GLOBAL_STYLE)
 
     def salvar_alteracoes(self):
         nome = self.input_nome.text().strip()

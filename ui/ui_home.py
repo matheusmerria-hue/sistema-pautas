@@ -33,6 +33,7 @@ class HomeWindow(QMainWindow):
         self.filtro_periodo_acervo = "Todos"
         self.setWindowTitle("Sistema de Pautas Audiovisuais")
         self.resize(1200, 760)
+        self.setMinimumSize(960, 640)
 
         root = QWidget()
         root_layout = QHBoxLayout(root)
@@ -61,12 +62,12 @@ class HomeWindow(QMainWindow):
     def criar_sidebar(self):
         sidebar = QFrame()
         sidebar.setObjectName("Sidebar")
-        sidebar.setFixedWidth(280)
+        sidebar.setFixedWidth(264)
 
         layout = QVBoxLayout(sidebar)
         self.sidebar_layout = layout
-        layout.setContentsMargins(24, 28, 24, 24)
-        layout.setSpacing(16)
+        layout.setContentsMargins(18, 22, 18, 20)
+        layout.setSpacing(10)
 
         self.btn_toggle_sidebar = QPushButton("")
         self.btn_toggle_sidebar.setObjectName("SecondaryButton")
@@ -81,18 +82,18 @@ class HomeWindow(QMainWindow):
 
         self.logo = QLabel("SP")
         self.logo.setAlignment(Qt.AlignCenter)
-        self.logo.setFixedSize(64, 64)
+        self.logo.setFixedSize(56, 56)
         self.logo.setStyleSheet("""
             QLabel {
                 background-color: #2D6CDF;
-                border-radius: 18px;
-                font-size: 26px;
+                border-radius: 14px;
+                font-size: 22px;
                 font-weight: bold;
             }
         """)
 
         self.sidebar_title = QLabel("SISTEMA\nDE PAUTAS")
-        self.sidebar_title.setStyleSheet("font-size: 26px; font-weight: bold;")
+        self.sidebar_title.setStyleSheet("font-size: 22px; font-weight: 700;")
 
         self.sidebar_subtitle = QLabel(APP_SUBTITLE)
         self.sidebar_subtitle.setStyleSheet("color: #94A3B8; font-size: 14px;")
@@ -101,7 +102,7 @@ class HomeWindow(QMainWindow):
         layout.addSpacing(8)
         layout.addWidget(self.sidebar_title)
         layout.addWidget(self.sidebar_subtitle)
-        layout.addSpacing(32)
+        layout.addSpacing(20)
 
         self.btn_dashboard = QPushButton()
         self.btn_dashboard.setObjectName("SecondaryButton")
@@ -159,14 +160,14 @@ class HomeWindow(QMainWindow):
     def criar_dashboard_page(self):
         content = QWidget()
         layout = QVBoxLayout(content)
-        layout.setContentsMargins(36, 32, 36, 32)
-        layout.setSpacing(22)
+        layout.setContentsMargins(32, 26, 32, 26)
+        layout.setSpacing(18)
 
         header_title = QLabel("Acervo")
-        header_title.setStyleSheet("font-size: 34px; font-weight: bold;")
+        header_title.setObjectName("PageTitle")
 
         header_subtitle = QLabel("Organize e acompanhe suas pautas por status, responsável e período.")
-        header_subtitle.setStyleSheet("color: #94A3B8; font-size: 16px;")
+        header_subtitle.setObjectName("PageSubtitle")
 
         layout.addWidget(header_title)
         layout.addWidget(header_subtitle)
@@ -266,7 +267,7 @@ class HomeWindow(QMainWindow):
         lista_header = QHBoxLayout()
 
         lista_titulo = QLabel("Pautas")
-        lista_titulo.setStyleSheet("font-size: 22px; font-weight: bold;")
+        lista_titulo.setObjectName("SectionTitle")
 
         lista_total = QLabel(f"{len(pautas)} pauta(s) encontradas")
         lista_total.setStyleSheet("color: #94A3B8; font-size: 14px;")
@@ -377,7 +378,7 @@ class HomeWindow(QMainWindow):
         self.sidebar_aberta = not self.sidebar_aberta
 
         if self.sidebar_aberta:
-            self.sidebar.setFixedWidth(280)
+            self.sidebar.setFixedWidth(264)
 
             self.logo.setVisible(True)
             self.sidebar_title.setVisible(True)

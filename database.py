@@ -300,28 +300,36 @@ def buscar_pautas(
     cursor.execute(query, params)
     pautas = cursor.fetchall()
 
-    resultado = []
+    pautas_por_id = {pauta["id"]: [] for pauta in pautas}
 
-    for pauta in pautas:
+    pauta_ids = tuple(pautas_por_id)
+    for inicio in range(0, len(pauta_ids), 900):
+        lote_ids = pauta_ids[inicio:inicio + 900]
+        placeholders = ",".join("?" for _ in lote_ids)
         cursor.execute("""
             SELECT *
             FROM takes
-            WHERE pauta_id = ?
+            WHERE pauta_id IN ({})
             ORDER BY
+                pauta_id,
                 CASE
                     WHEN comentario IS NOT NULL AND comentario != '' THEN 0
                     ELSE 1
                 END,
                 marcado_como_importante DESC,
                 nome_arquivo ASC
-        """, (pauta["id"],))
+        """.format(placeholders), lote_ids)
 
-        takes = cursor.fetchall()
+        for take in cursor.fetchall():
+            pautas_por_id[take["pauta_id"]].append(dict(take))
 
-        resultado.append({
+    resultado = [
+        {
             "pauta": dict(pauta),
-            "takes": [dict(take) for take in takes]
-        })
+            "takes": pautas_por_id[pauta["id"]]
+        }
+        for pauta in pautas
+    ]
 
     conn.close()
     return resultado
@@ -730,4 +738,3 @@ def alternar_favorito_pauta(pauta_id, favorita):
 
 
 
-    

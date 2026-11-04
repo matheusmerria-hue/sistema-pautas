@@ -2,6 +2,10 @@ import sqlite3
 from datetime import datetime
 from config import DB_PATH
 import re
+import json
+import unicodedata
+from functools import wraps
+from contextlib import closing
 from collections import Counter
 
 
@@ -18,7 +22,54 @@ def get_connection():
     """
 
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    return sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH)
+    conn.create_function("normalizar", 1, normalizar, deterministic=True)
+    return conn
+
+
+def normalizar(valor):
+    texto = " ".join((valor or "").split()).casefold()
+    return "".join(c for c in unicodedata.normalize("NFD", texto)
+                   if not unicodedata.combining(c))
+
+
+def compat_cliente(func):
+    """Aceita o antigo argumento nomeado durante a transição das integrações."""
+    @wraps(func)
+    def call(*args, **kwargs):
+        if "candidato" in kwargs:
+            legado = kwargs.pop("candidato")
+            kwargs.setdefault("cliente", "" if legado == "Todos" else legado)
+        return func(*args, **kwargs)
+    return call
+
+
+def resolver_cliente(conn, cliente):
+    cliente = " ".join((cliente or "").split())
+    if not cliente:
+        conn.close()
+        raise ValueError("Preencha o nome do cliente.")
+    row = conn.execute(
+        "SELECT cliente FROM pautas WHERE normalizar(cliente) = ? ORDER BY id LIMIT 1",
+        (normalizar(cliente),)
+    ).fetchone()
+    return row[0] if row else cliente
+
+
+def listar_clientes():
+    """Nomes disponíveis para busca, sem duplicatas de caixa/espaços/acentos."""
+    with closing(get_connection()) as conn:
+        rows = conn.execute("""
+            SELECT cliente FROM pautas
+            WHERE IFNULL(excluida, 0) = 0
+              AND TRIM(IFNULL(cliente, '')) != ''
+            ORDER BY id
+        """)
+        nomes = {}
+        for (nome,) in rows:
+            nome = " ".join(nome.split())
+            nomes.setdefault(normalizar(nome), nome)
+    return sorted(nomes.values(), key=normalizar)
 
 
 # ==========================================================
@@ -36,6 +87,22 @@ def init_database():
     conn = get_connection()
     cursor = conn.cursor()
 
+    # Backup consistente antes de qualquer mudança no banco legado.
+    colunas = {r[1] for r in cursor.execute("PRAGMA table_info(pautas)")}
+    if "candidato" in colunas and "cliente" not in colunas:
+        backup = DB_PATH.with_name(DB_PATH.name + ".antes-clientes-" +
+                                   datetime.now().strftime("%Y%m%d-%H%M%S-%f") + ".bak")
+        with closing(sqlite3.connect(backup)) as destino:
+            conn.backup(destino)
+        try:
+            conn.execute("BEGIN IMMEDIATE")
+            cursor.execute("ALTER TABLE pautas RENAME COLUMN candidato TO cliente")
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            conn.close()
+            raise
+
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS historico_buscas (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -49,7 +116,7 @@ def init_database():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             nome_pauta TEXT NOT NULL,
             data_pauta TEXT,
-            candidato TEXT NOT NULL,
+            cliente TEXT NOT NULL,
             descricao_inicial TEXT,
             caminho_pasta TEXT NOT NULL,
             data_criacao TEXT NOT NULL,
@@ -82,6 +149,12 @@ def init_database():
             ALTER TABLE pautas ADD COLUMN favorita INTEGER DEFAULT 0
         """)
 
+    if "status_pauta" not in colunas_pautas:
+        cursor.execute("ALTER TABLE pautas ADD COLUMN status_pauta TEXT DEFAULT 'a_editar'")
+
+    if "filtros" not in {r[1] for r in cursor.execute("PRAGMA table_info(historico_buscas)")}:
+        cursor.execute("ALTER TABLE historico_buscas ADD COLUMN filtros TEXT NOT NULL DEFAULT '{}'")
+
     cursor.execute("PRAGMA table_info(takes)")
     colunas_takes = [coluna[1] for coluna in cursor.fetchall()]
 
@@ -103,12 +176,16 @@ def init_database():
     conn.commit()
     conn.close()
 
+    from smart_locate import init_storage
+    init_storage()
+
 
 # ==========================================================
 # SALVAR NOVA PAUTA
 # ==========================================================
 
-def salvar_pauta(nome_pauta, data_pauta, candidato, descricao, caminho_pasta, takes):
+@compat_cliente
+def salvar_pauta(nome_pauta, data_pauta, cliente="", descricao="", caminho_pasta="", takes=()):
     """
     Salva uma nova pauta no banco.
 
@@ -117,6 +194,7 @@ def salvar_pauta(nome_pauta, data_pauta, candidato, descricao, caminho_pasta, ta
     """
 
     conn = get_connection()
+    cliente = resolver_cliente(conn, cliente)
     cursor = conn.cursor()
 
     agora = datetime.now().isoformat(timespec="seconds")
@@ -126,7 +204,7 @@ def salvar_pauta(nome_pauta, data_pauta, candidato, descricao, caminho_pasta, ta
         INSERT INTO pautas (
             nome_pauta,
             data_pauta,
-            candidato,
+            cliente,
             descricao_inicial,
             caminho_pasta,
             data_criacao,
@@ -136,7 +214,7 @@ def salvar_pauta(nome_pauta, data_pauta, candidato, descricao, caminho_pasta, ta
     """, (
         nome_pauta,
         data_pauta,
-        candidato,
+        cliente,
         descricao,
         caminho_pasta,
         agora,
@@ -171,7 +249,8 @@ def salvar_pauta(nome_pauta, data_pauta, candidato, descricao, caminho_pasta, ta
     conn.close()
 
 
-def listar_pautas_acervo(candidato="Todos", periodo="Todos", status="Todos"):
+@compat_cliente
+def listar_pautas_acervo(cliente="", periodo="Todos", status="Todos"):
     conn = get_connection()
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
@@ -202,9 +281,9 @@ def listar_pautas_acervo(candidato="Todos", periodo="Todos", status="Todos"):
 
     params = []
 
-    if candidato != "Todos":
-        query += " AND candidato = ?"
-        params.append(candidato)
+    if normalizar(cliente):
+        query += " AND instr(normalizar(cliente), ?) > 0"
+        params.append(normalizar(cliente))
 
     if status != "Todos":
         query += " AND IFNULL(status_pauta, 'a_editar') = ?"
@@ -232,11 +311,12 @@ def listar_pautas_acervo(candidato="Todos", periodo="Todos", status="Todos"):
 # BUSCAR PAUTAS
 # ==========================================================
 
+@compat_cliente
 def buscar_pautas(
     palavra_chave="",
     data_inicial="",
     data_final="",
-    candidato="Todos",
+    cliente="",
     somente_pautas_favoritas=False
 ):
     """
@@ -246,7 +326,7 @@ def buscar_pautas(
     - palavra-chave
     - data inicial
     - data final
-    - candidato
+    - cliente
     - somente pautas favoritas
     """
 
@@ -274,54 +354,63 @@ def buscar_pautas(
                 p.nome_pauta LIKE ?
                 OR p.descricao_inicial LIKE ?
                 OR p.data_pauta LIKE ?
-                OR p.candidato LIKE ?
+                OR instr(normalizar(p.cliente), normalizar(?)) > 0
                 OR t.nome_arquivo LIKE ?
                 OR t.comentario LIKE ?
                 OR t.tags LIKE ?
             )
         """
         termo = f"%{palavra_chave}%"
-        params.extend([termo, termo, termo, termo, termo, termo, termo])
+        params.extend([termo, termo, termo, palavra_chave, termo, termo, termo])
 
+    data_sql = "CASE WHEN p.data_pauta LIKE '__/__/____' THEN substr(p.data_pauta,7,4)||'-'||substr(p.data_pauta,4,2)||'-'||substr(p.data_pauta,1,2) ELSE p.data_pauta END"
     if data_inicial:
-        query += " AND p.data_pauta >= ?"
-        params.append(data_inicial)
+        query += f" AND {data_sql} >= ?"
+        params.append(data_inicial[6:10] + '-' + data_inicial[3:5] + '-' + data_inicial[:2] if re.fullmatch(r'\d{2}/\d{2}/\d{4}', data_inicial) else data_inicial)
 
     if data_final:
-        query += " AND p.data_pauta <= ?"
-        params.append(data_final)
+        query += f" AND {data_sql} <= ?"
+        params.append(data_final[6:10] + '-' + data_final[3:5] + '-' + data_final[:2] if re.fullmatch(r'\d{2}/\d{2}/\d{4}', data_final) else data_final)
 
-    if candidato and candidato != "Todos":
-        query += " AND p.candidato = ?"
-        params.append(candidato)
+    if normalizar(cliente):
+        query += " AND instr(normalizar(p.cliente), ?) > 0"
+        params.append(normalizar(cliente))
 
     query += " ORDER BY p.data_pauta DESC, p.id DESC"
 
     cursor.execute(query, params)
     pautas = cursor.fetchall()
 
-    resultado = []
+    pautas_por_id = {pauta["id"]: [] for pauta in pautas}
 
-    for pauta in pautas:
+    pauta_ids = tuple(pautas_por_id)
+    for inicio in range(0, len(pauta_ids), 900):
+        lote_ids = pauta_ids[inicio:inicio + 900]
+        placeholders = ",".join("?" for _ in lote_ids)
         cursor.execute("""
             SELECT *
             FROM takes
-            WHERE pauta_id = ?
+            WHERE pauta_id IN ({})
             ORDER BY
+                pauta_id,
                 CASE
                     WHEN comentario IS NOT NULL AND comentario != '' THEN 0
                     ELSE 1
                 END,
                 marcado_como_importante DESC,
                 nome_arquivo ASC
-        """, (pauta["id"],))
+        """.format(placeholders), lote_ids)
 
-        takes = cursor.fetchall()
+        for take in cursor.fetchall():
+            pautas_por_id[take["pauta_id"]].append(dict(take))
 
-        resultado.append({
+    resultado = [
+        {
             "pauta": dict(pauta),
-            "takes": [dict(take) for take in takes]
-        })
+            "takes": pautas_por_id[pauta["id"]]
+        }
+        for pauta in pautas
+    ]
 
     conn.close()
     return resultado
@@ -416,8 +505,10 @@ def obter_pauta_com_takes(pauta_id):
 # ATUALIZAR PAUTA EXISTENTE
 # ==========================================================
 
-def atualizar_pauta(pauta_id, nome_pauta, data_pauta, candidato, descricao, takes):
+@compat_cliente
+def atualizar_pauta(pauta_id, nome_pauta, data_pauta, cliente="", descricao="", takes=()):
     conn = get_connection()
+    cliente = resolver_cliente(conn, cliente)
     cursor = conn.cursor()
 
     agora = datetime.now().isoformat(timespec="seconds")
@@ -427,14 +518,14 @@ def atualizar_pauta(pauta_id, nome_pauta, data_pauta, candidato, descricao, take
         UPDATE pautas
         SET nome_pauta = ?,
             data_pauta = ?,
-            candidato = ?,
+            cliente = ?,
             descricao_inicial = ?,
             data_atualizacao = ?
         WHERE id = ?
     """, (
         nome_pauta,
         data_pauta,
-        candidato,
+        cliente,
         descricao,
         agora,
         pauta_id
@@ -448,13 +539,13 @@ def atualizar_pauta(pauta_id, nome_pauta, data_pauta, candidato, descricao, take
                 tags = ?,
                 marcado_como_importante = ?,
                 status_take = ?
-            WHERE id = ?
+            WHERE id = ? AND pauta_id = ?
         """, (
             take["comentario"],
             take.get("tags", ""),
             1 if take["importante"] else 0,
             take.get("status_take", "talvez"),
-            take["id"]
+            take["id"], pauta_id
         ))
 
     conn.commit()
@@ -465,16 +556,17 @@ def atualizar_pauta(pauta_id, nome_pauta, data_pauta, candidato, descricao, take
 # ESTATÍSTICAS DO SISTEMA
 # ==========================================================
 
-def obter_estatisticas(candidato="Todos"):
+@compat_cliente
+def obter_estatisticas(cliente=""):
     conn = get_connection()
     cursor = conn.cursor()
 
     filtro = "WHERE IFNULL(p.excluida, 0) = 0"
     params = []
 
-    if candidato != "Todos":
-        filtro += " AND p.candidato = ?"
-        params.append(candidato)
+    if normalizar(cliente):
+        filtro += " AND instr(normalizar(p.cliente), ?) > 0"
+        params.append(normalizar(cliente))
 
     cursor.execute(f"""
         SELECT COUNT(*)
@@ -501,12 +593,12 @@ def obter_estatisticas(candidato="Todos"):
     takes_comentados = cursor.fetchone()[0]
 
     cursor.execute("""
-        SELECT candidato, COUNT(*)
+        SELECT cliente, COUNT(*)
         FROM pautas
         WHERE IFNULL(excluida, 0) = 0
-        GROUP BY candidato
+        GROUP BY cliente
     """)
-    pautas_por_candidato = dict(cursor.fetchall())
+    pautas_por_cliente = dict(cursor.fetchall())
 
     cursor.execute(f"""
         SELECT COUNT(*)
@@ -531,7 +623,7 @@ def obter_estatisticas(candidato="Todos"):
         "total_pautas": total_pautas,
         "total_takes": total_takes,
         "takes_comentados": takes_comentados,
-        "pautas_por_candidato": pautas_por_candidato,
+        "pautas_por_cliente": pautas_por_cliente,
         "pautas_ultimos_7_dias": pautas_ultimos_7_dias,
         "ultima_pauta": ultima[0] if ultima else "Nenhuma pauta cadastrada",
         "ultima_data": ultima[1] if ultima else ""
@@ -567,16 +659,16 @@ def alternar_favorito_take(take_id, favorito):
 # SALVAR HISTÓRICO DE BUSCA
 # ==========================================================
 
-def salvar_busca(termo):
+def salvar_busca(termo, **filtros):
     """
     Salva um termo pesquisado no histórico.
 
-    Termos vazios são ignorados.
+    Buscas sem termo também são registradas quando possuem filtros.
     """
 
     termo = termo.strip()
 
-    if not termo:
+    if not termo and not any(filtros.values()):
         return
 
     conn = get_connection()
@@ -585,12 +677,13 @@ def salvar_busca(termo):
     cursor.execute("""
         INSERT INTO historico_buscas (
             termo,
-            data_busca
+            data_busca, filtros
         )
-        VALUES (?, ?)
+        VALUES (?, ?, ?)
     """, (
         termo,
-        datetime.now().isoformat()
+        datetime.now().isoformat(),
+        json.dumps(filtros, ensure_ascii=False, sort_keys=True)
     ))
 
     conn.commit()
@@ -601,7 +694,7 @@ def salvar_busca(termo):
 # OBTER HISTÓRICO DE BUSCAS
 # ==========================================================
 
-def obter_historico_buscas(limite=10):
+def obter_historico_buscas(limite=10, detalhado=False):
     """
     Retorna os últimos termos pesquisados.
 
@@ -612,14 +705,15 @@ def obter_historico_buscas(limite=10):
     cursor = conn.cursor()
 
     cursor.execute("""
-        SELECT termo
+        SELECT termo, filtros
         FROM historico_buscas
-        GROUP BY termo
+        GROUP BY termo, filtros
         ORDER BY MAX(id) DESC
         LIMIT ?
     """, (limite,))
 
-    resultado = [row[0] for row in cursor.fetchall()]
+    rows = cursor.fetchall()
+    resultado = [{"termo": row[0], **json.loads(row[1] or '{}')} for row in rows] if detalhado else [row[0] for row in rows]
 
     conn.close()
 
@@ -630,16 +724,17 @@ def obter_historico_buscas(limite=10):
 # OBTER PALAVRAS MAIS FREQUENTES
 # ==========================================================
 
-def obter_top_palavras(limite=10, candidato="Todos"):
+@compat_cliente
+def obter_top_palavras(limite=10, cliente=""):
     conn = get_connection()
     cursor = conn.cursor()
 
     filtro = "WHERE IFNULL(p.excluida, 0) = 0"
     params = []
 
-    if candidato != "Todos":
-        filtro += " AND p.candidato = ?"
-        params.append(candidato)
+    if normalizar(cliente):
+        filtro += " AND instr(normalizar(p.cliente), ?) > 0"
+        params.append(normalizar(cliente))
 
     cursor.execute(f"""
         SELECT 
@@ -671,7 +766,7 @@ def obter_top_palavras(limite=10, candidato="Todos"):
         "com", "para", "por", "dos", "das", "uma", "uns", "nas", "nos",
         "que", "não", "sim", "sobre", "take", "cena", "fala", "falas",
         "arquivo", "video", "vídeo", "audio", "áudio", "mp4", "mov",
-        "mxf", "avi", "wav", "mp3", "candidato", "candidata",
+        "mxf", "avi", "wav", "mp3", "cliente", "candidato", "candidata",
         "importante", "pauta", "pautas", "bruto", "brutos"
     }
 
@@ -730,4 +825,3 @@ def alternar_favorito_pauta(pauta_id, favorita):
 
 
 
-    

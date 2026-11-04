@@ -1,0 +1,58 @@
+VERIFICADOR DE PAUTAS — DOIS HDs
+
+VERSÃO DO GITHUB
+Os dados pessoais/exportações JSON e o pacote ZIP não são publicados no
+repositório. Ao usar estes fontes, selecione na interface uma exportação
+resultado_busca.json existente no seu computador.
+
+COMO USAR
+1. Extraia todo o ZIP para uma pasta no computador Windows.
+2. É necessário Python 3.10 ou superior com Tkinter/Tcl-Tk (biblioteca padrão).
+3. Abra INICIAR.bat. Também pode executar: python verificar_pautas.py
+4. O registro resultado_busca.json enviado já está incluído e selecionado.
+5. Escolha o HD 1 e o HD 2 (ou uma pasta principal de pautas em cada HD).
+6. Clique em VERIFICAR OS DOIS HDs e depois SALVAR LISTA TXT.
+
+RESULTADO
+Bloco HD 1 e bloco HD 2, com nomes e caminhos atuais das pastas pendentes.
+Pastas sem data primeiro; datas em ordem crescente, da antiga para a recente.
+Formatos: AAAA-MM-DD, DD-MM-AAAA, equivalentes com ponto, espaço ou
+sublinhado, e AAAAMMDD. Datas devem estar no início, com ano de 4 dígitos.
+Data inválida é tratada como ausência de data.
+
+COMPARAÇÃO
+Usa data + nome da primeira pasta datada no caminho registrado. Ignora letra
+do HD e pastas anteriores. Mudança de HD/local não cria pendência se a data e
+o nome continuarem iguais. Acentos, maiúsculas, espaços e pontuação são
+normalizados. Não exclui uma pauta só por haver outra no mesmo dia.
+Quando o caminho do registro não tem data, retira sufixos técnicos conhecidos
+(PRIVATE/M4ROOT/CLIP, BRUTO, CARD1 etc.) e compara pelo nome restante.
+Todos os registros fornecidos contam como cadastrados, inclusive se houver
+marca de exclusão: esta ferramenta compara presença na exportação enviada.
+
+LIMITES IMPORTANTES
+Uma pasta com correspondência não prova que todos os vídeos/subpastas foram
+revisados. O programa não compara conteúdo nem detecta novos vídeos dentro
+de uma pauta já registrada. Nomes e datas iguais são considerados a mesma
+pauta mesmo que os conteúdos sejam diferentes. Se a pauta foi renomeada,
+pode aparecer como pendente; confira manualmente. O relatório inclui uma
+seção de auditoria com as pastas reconhecidas.
+
+PASTAS SEM DATA
+Fora de uma pasta datada, todas as subpastas sem correspondência são listadas
+para conferência, inclusive pastas de organização e subpastas de câmeras.
+Isso evita adivinhar quais pastas sem data são pautas. Para uma lista mais
+limpa, selecione as pastas principais de pautas em vez da raiz inteira do HD.
+A raiz escolhida é tratada como contêiner, exceto se tiver data ou registro.
+Dentro de uma pauta datada, subpastas sem data não viram pautas separadas;
+outras pastas datadas continuam sendo encontradas recursivamente.
+
+SEGURANÇA E ACESSO
+Somente lê nomes e estrutura das pastas e o JSON. Não move, apaga ou altera
+arquivos dos HDs, não atualiza o registro e não usa internet. Só escreve o TXT
+no destino que você selecionar. Pastas inacessíveis são reportadas; atalhos,
+junções e pontos de redirecionamento não são seguidos. A lixeira e System
+Volume Information são ignorados. Cancelamento gera relatório parcial.
+
+O programa foi verificado com pastas simuladas e a exportação fornecida.
+A interface Windows e os seus HDs precisam ser executados no seu computador.

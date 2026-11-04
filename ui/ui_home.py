@@ -9,7 +9,7 @@ from PySide6.QtWidgets import (
     QStackedWidget,
     QFileDialog,
     QMessageBox,
-    QScrollArea
+    QScrollArea, QLineEdit
 )
 from PySide6.QtCore import Qt, QSize
 from exporter import exportar_json, exportar_csv
@@ -17,9 +17,11 @@ from ui.ui_create import CreatePautaWindow
 from ui.ui_search import SearchPautaWindow
 from user_config import MODO
 from theme import GLOBAL_STYLE, APP_VERSION, APP_SUBTITLE, APP_TEAM
-from database import obter_estatisticas, obter_top_palavras, listar_pautas_acervo,atualizar_status_pauta
-from config import CANDIDATOS
+from database import listar_pautas_acervo, atualizar_status_pauta
 from PySide6.QtGui import QIcon
+from ui.client_search import ClientSearchInput
+from ui.ui_locate import open_locator, allow_close
+import os
 
 
 
@@ -28,11 +30,12 @@ class HomeWindow(QMainWindow):
     def __init__(self):
         super().__init__()
 
-        self.filtro_acervo_atual = "Todos"
+        self.filtro_acervo_atual = ""
         self.filtro_status_acervo = "Todos"
         self.filtro_periodo_acervo = "Todos"
         self.setWindowTitle("Sistema de Pautas Audiovisuais")
         self.resize(1200, 760)
+        self.setMinimumSize(960, 640)
 
         root = QWidget()
         root_layout = QHBoxLayout(root)
@@ -61,12 +64,12 @@ class HomeWindow(QMainWindow):
     def criar_sidebar(self):
         sidebar = QFrame()
         sidebar.setObjectName("Sidebar")
-        sidebar.setFixedWidth(280)
+        sidebar.setFixedWidth(264)
 
         layout = QVBoxLayout(sidebar)
         self.sidebar_layout = layout
-        layout.setContentsMargins(24, 28, 24, 24)
-        layout.setSpacing(16)
+        layout.setContentsMargins(18, 22, 18, 20)
+        layout.setSpacing(10)
 
         self.btn_toggle_sidebar = QPushButton("")
         self.btn_toggle_sidebar.setObjectName("SecondaryButton")
@@ -81,18 +84,18 @@ class HomeWindow(QMainWindow):
 
         self.logo = QLabel("SP")
         self.logo.setAlignment(Qt.AlignCenter)
-        self.logo.setFixedSize(64, 64)
+        self.logo.setFixedSize(56, 56)
         self.logo.setStyleSheet("""
             QLabel {
                 background-color: #2D6CDF;
-                border-radius: 18px;
-                font-size: 26px;
+                border-radius: 14px;
+                font-size: 22px;
                 font-weight: bold;
             }
         """)
 
         self.sidebar_title = QLabel("SISTEMA\nDE PAUTAS")
-        self.sidebar_title.setStyleSheet("font-size: 26px; font-weight: bold;")
+        self.sidebar_title.setStyleSheet("font-size: 22px; font-weight: 700;")
 
         self.sidebar_subtitle = QLabel(APP_SUBTITLE)
         self.sidebar_subtitle.setStyleSheet("color: #94A3B8; font-size: 14px;")
@@ -101,7 +104,7 @@ class HomeWindow(QMainWindow):
         layout.addSpacing(8)
         layout.addWidget(self.sidebar_title)
         layout.addWidget(self.sidebar_subtitle)
-        layout.addSpacing(32)
+        layout.addSpacing(20)
 
         self.btn_dashboard = QPushButton()
         self.btn_dashboard.setObjectName("SecondaryButton")
@@ -142,6 +145,10 @@ class HomeWindow(QMainWindow):
         )
         self.btn_exportar.clicked.connect(self.exportar_dados)
         layout.addWidget(self.btn_exportar)
+        self.btn_localizar = QPushButton('Localizar arquivos perdidos')
+        self.btn_localizar.setObjectName('SecondaryButton')
+        self.btn_localizar.clicked.connect(lambda: open_locator(self))
+        layout.addWidget(self.btn_localizar)
 
         layout.addStretch()
 
@@ -159,20 +166,20 @@ class HomeWindow(QMainWindow):
     def criar_dashboard_page(self):
         content = QWidget()
         layout = QVBoxLayout(content)
-        layout.setContentsMargins(36, 32, 36, 32)
-        layout.setSpacing(22)
+        layout.setContentsMargins(32, 26, 32, 26)
+        layout.setSpacing(18)
 
         header_title = QLabel("Acervo")
-        header_title.setStyleSheet("font-size: 34px; font-weight: bold;")
+        header_title.setObjectName("PageTitle")
 
         header_subtitle = QLabel("Organize e acompanhe suas pautas por status, responsável e período.")
-        header_subtitle.setStyleSheet("color: #94A3B8; font-size: 16px;")
+        header_subtitle.setObjectName("PageSubtitle")
 
         layout.addWidget(header_title)
         layout.addWidget(header_subtitle)
 
         pautas = listar_pautas_acervo(
-            candidato=self.filtro_acervo_atual,
+            cliente=self.filtro_acervo_atual,
             periodo=self.filtro_periodo_acervo,
             status=self.filtro_status_acervo
         )
@@ -201,28 +208,18 @@ class HomeWindow(QMainWindow):
         responsavel_layout.setContentsMargins(16, 12, 16, 12)
         responsavel_layout.setSpacing(10)
 
-        responsavel_label = QLabel("Responsável")
+        responsavel_label = QLabel("Cliente")
         responsavel_label.setStyleSheet("color: #94A3B8; font-size: 14px; font-weight: 600;")
 
         responsavel_layout.addWidget(responsavel_label)
         responsavel_layout.addSpacing(10)
 
-        responsavel_layout.addWidget(
-            self.criar_segment_button(
-                "Todos",
-                self.filtro_acervo_atual == "Todos",
-                lambda: self.selecionar_filtro_acervo("candidato", "Todos")
-            )
+        self.input_cliente_acervo = ClientSearchInput(self.filtro_acervo_atual)
+        self.input_cliente_acervo.setPlaceholderText("Digite o nome do cliente")
+        self.input_cliente_acervo.editingFinished.connect(
+            lambda: self.selecionar_filtro_acervo("cliente", self.input_cliente_acervo.text().strip())
         )
-
-        for candidato in CANDIDATOS:
-            responsavel_layout.addWidget(
-                self.criar_segment_button(
-                    candidato,
-                    self.filtro_acervo_atual == candidato,
-                    lambda checked=False, c=candidato: self.selecionar_filtro_acervo("candidato", c)
-                )
-            )
+        responsavel_layout.addWidget(self.input_cliente_acervo)
 
         responsavel_layout.addStretch()
 
@@ -266,7 +263,7 @@ class HomeWindow(QMainWindow):
         lista_header = QHBoxLayout()
 
         lista_titulo = QLabel("Pautas")
-        lista_titulo.setStyleSheet("font-size: 22px; font-weight: bold;")
+        lista_titulo.setObjectName("SectionTitle")
 
         lista_total = QLabel(f"{len(pautas)} pauta(s) encontradas")
         lista_total.setStyleSheet("color: #94A3B8; font-size: 14px;")
@@ -377,7 +374,7 @@ class HomeWindow(QMainWindow):
         self.sidebar_aberta = not self.sidebar_aberta
 
         if self.sidebar_aberta:
-            self.sidebar.setFixedWidth(280)
+            self.sidebar.setFixedWidth(264)
 
             self.logo.setVisible(True)
             self.sidebar_title.setVisible(True)
@@ -445,14 +442,6 @@ class HomeWindow(QMainWindow):
                 f"Não foi possível exportar os dados:\n\n{erro}"
             )
 
-    def selecionar_filtro_acervo(self, selecionado):
-        self.filtro_acervo_atual = selecionado
-
-        self.dashboard_page.deleteLater()
-        self.dashboard_page = self.criar_dashboard_page()
-        self.pages.insertWidget(0, self.dashboard_page)
-        self.pages.setCurrentWidget(self.dashboard_page)
-
     def configurar_botao_sidebar(self, botao, texto, icone):
         botao.setText(texto)
         botao.setIcon(QIcon(icone))
@@ -464,7 +453,9 @@ class HomeWindow(QMainWindow):
         if tipo == "status":
             self.filtro_status_acervo = valor
 
-        elif tipo == "candidato":
+        elif tipo == "cliente":
+            if self.filtro_acervo_atual == valor:
+                return
             self.filtro_acervo_atual = valor
 
         elif tipo == "periodo":
@@ -511,7 +502,7 @@ class HomeWindow(QMainWindow):
         nome = QLabel(pauta.get("nome_pauta") or "Sem nome")
         nome.setObjectName("AcervoPautaTitulo")
 
-        meta = QLabel(f"{pauta.get('data_pauta') or ''} • {pauta.get('candidato') or ''}")
+        meta = QLabel(f"{pauta.get('data_pauta') or ''} • {pauta.get('cliente') or ''}")
         meta.setObjectName("AcervoPautaMeta")
 
         info.addWidget(nome)
@@ -519,8 +510,17 @@ class HomeWindow(QMainWindow):
 
         layout.addWidget(status_label)
         layout.addLayout(info, stretch=1)
+        if not os.path.isdir(pauta.get('caminho_pasta') or ''):
+            localizar = QPushButton('Localizar')
+            localizar.clicked.connect(lambda: open_locator(self,pauta_id=pauta['id']))
+            layout.addWidget(localizar)
 
         return item
+
+    def closeEvent(self,event):
+        if not allow_close(self,event):return
+        self.search_page.media_loader.encerrar()
+        super().closeEvent(event)
 
 
 

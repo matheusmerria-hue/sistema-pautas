@@ -1,10 +1,11 @@
 import os
 import html
+import re
 
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
     QPushButton, QComboBox, QScrollArea, QFrame, QCheckBox,
-    QMessageBox, QDialog, QTextEdit, QFileDialog, QToolButton
+    QMessageBox, QDialog, QTextEdit, QFileDialog, QToolButton, QLayout
 )
 from database import (
     buscar_pautas,
@@ -15,16 +16,11 @@ from database import (
     obter_historico_buscas,
     alternar_favorito_pauta
 )
-from thumbnailer import gerar_thumbnail, obter_info_video
-from PySide6.QtGui import QGuiApplication, QPixmap
+from PySide6.QtGui import QGuiApplication
 
 from PySide6.QtCore import (
      Qt,
      QTimer,
-     QObject,
-     Signal,
-     QRunnable,
-     QThreadPool,
      Slot
  )
 
@@ -32,18 +28,11 @@ from PySide6.QtCore import (
 
 
 
-from PySide6.QtGui import QGuiApplication, QPixmap
-
-from config import CANDIDATOS
-from database import buscar_pautas, excluir_pauta, atualizar_pauta, alternar_favorito_take
-
 from exporter import exportar_resultados_json, exportar_resultados_csv
-
-
-MEDIA_THREAD_POOL = QThreadPool.globalInstance()
-MEDIA_THREAD_POOL.setMaxThreadCount(2)
-
-
+from media_loader import MediaLoader
+from theme import GLOBAL_STYLE, SPACING
+from ui.client_search import ClientSearchInput
+from ui.ui_locate import open_locator, allow_close
 
 class SearchPautaWindow(QWidget):
     def __init__(self):
@@ -53,7 +42,12 @@ class SearchPautaWindow(QWidget):
         self.resize(1100, 750)
 
         self.main_layout = QVBoxLayout(self)
+        self.main_layout.setSizeConstraint(QLayout.SetNoConstraint)
+        self.main_layout.setContentsMargins(SPACING["xxl"], SPACING["xl"], SPACING["xxl"], SPACING["xl"])
+        self.main_layout.setSpacing(SPACING["md"])
         self.resultados_exportaveis = []
+        self.media_loader = MediaLoader(self)
+        self.media_generation = self.media_loader.generation
         self.search_timer = QTimer(self)
         self.search_timer.setSingleShot(True)
         self.search_timer.setInterval(500)
@@ -65,16 +59,17 @@ class SearchPautaWindow(QWidget):
         self.aplicar_estilo()
         self.atualizar_historico()
 
-    def executar_busca_instantanea(self):
-        self.executar_busca(salvar_no_historico=False)
+    def closeEvent(self, event):
+        if not allow_close(self,event): return
+        self.media_loader.encerrar()
+        super().closeEvent(event)
 
     def criar_cabecalho(self):
         title = QLabel("Buscar pautas")
-        title.setAlignment(Qt.AlignCenter)
-        title.setStyleSheet("font-size: 30px; font-weight: bold;")
+        title.setObjectName("PageTitle")
 
-        subtitle = QLabel("Busque por pauta, candidato, data, arquivo ou comentário dos takes.")
-        subtitle.setAlignment(Qt.AlignCenter)
+        subtitle = QLabel("Busque por pauta, cliente, data, arquivo ou comentário dos takes.")
+        subtitle.setObjectName("PageSubtitle")
 
         self.main_layout.addWidget(title)
         self.main_layout.addWidget(subtitle)
@@ -84,27 +79,36 @@ class SearchPautaWindow(QWidget):
         card.setObjectName("Card")
 
         layout = QVBoxLayout(card)
+        layout.setContentsMargins(20, 18, 20, 18)
+        layout.setSpacing(12)
 
         linha_1 = QHBoxLayout()
 
         self.input_palavra = QLineEdit()
-        self.input_palavra.setPlaceholderText("Palavra-chave. Ex: saúde, educação, hospital...")
+        self.input_palavra.setPlaceholderText("Palavra-chave")
         self.input_palavra.textChanged.connect(self.agendar_busca)
 
-        self.combo_candidato = QComboBox()
-        self.combo_candidato.addItem("Todos")
-        self.combo_candidato.addItems(CANDIDATOS)
+        self.input_cliente = ClientSearchInput()
+        self.input_cliente.setPlaceholderText("Digite o nome do cliente")
 
         linha_1.addWidget(self.input_palavra, stretch=3)
-        linha_1.addWidget(self.combo_candidato, stretch=1)
+        linha_1.addWidget(QLabel("Cliente"))
+        linha_1.addWidget(self.input_cliente, stretch=1)
 
         linha_2 = QHBoxLayout()
+        linha_2.setSpacing(12)
+
+        linha_opcoes = QVBoxLayout()
+        linha_opcoes.setSpacing(8)
+
+        linha_acoes = QHBoxLayout()
+        linha_acoes.setSpacing(10)
 
         self.input_data_inicial = QLineEdit()
-        self.input_data_inicial.setPlaceholderText("Data inicial. Ex: 2026-06-01")
+        self.input_data_inicial.setPlaceholderText("Data inicial (AAAA-MM-DD)")
 
         self.input_data_final = QLineEdit()
-        self.input_data_final.setPlaceholderText("Data final. Ex: 2026-06-30")
+        self.input_data_final.setPlaceholderText("Data final (AAAA-MM-DD)")
 
         self.check_somente_comentados = QCheckBox("Mostrar somente takes comentados")
         self.check_somente_favoritos = QCheckBox("Mostrar somente takes favoritos")
@@ -112,13 +116,13 @@ class SearchPautaWindow(QWidget):
 
         self.check_somente_comentados.setChecked(True)
 
-        self.combo_candidato.currentIndexChanged.connect(self.agendar_busca)
+        self.input_cliente.textChanged.connect(self.agendar_busca)
         self.check_somente_comentados.stateChanged.connect(self.agendar_busca)
         self.check_somente_favoritos.stateChanged.connect(self.agendar_busca)
         self.check_somente_pautas_favoritas.stateChanged.connect(self.agendar_busca)
 
         self.btn_buscar = QPushButton("Buscar")
-        self.btn_buscar.clicked.connect(self.executar_busca)
+        self.btn_buscar.clicked.connect(lambda: self.executar_busca())
 
         self.btn_exportar_resultado = QPushButton("Exportar resultado")
         self.btn_exportar_resultado.setObjectName("SecondaryButton")
@@ -127,14 +131,20 @@ class SearchPautaWindow(QWidget):
 
         linha_2.addWidget(self.input_data_inicial)
         linha_2.addWidget(self.input_data_final)
-        linha_2.addWidget(self.check_somente_comentados)
-        linha_2.addWidget(self.check_somente_favoritos)
-        linha_2.addWidget(self.check_somente_pautas_favoritas)
-        linha_2.addWidget(self.btn_buscar)
-        linha_2.addWidget(self.btn_exportar_resultado)
+        linha_opcoes.addWidget(self.check_somente_comentados)
+        linha_opcoes.addWidget(self.check_somente_favoritos)
+        linha_opcoes.addWidget(self.check_somente_pautas_favoritas)
+        linha_acoes.addStretch()
+        linha_acoes.addWidget(self.btn_buscar)
+        linha_acoes.addWidget(self.btn_exportar_resultado)
+        self.btn_localizar = QPushButton("Localizar arquivos perdidos")
+        self.btn_localizar.clicked.connect(lambda: open_locator(self))
+        linha_acoes.addWidget(self.btn_localizar)
 
         layout.addLayout(linha_1)
         layout.addLayout(linha_2)
+        layout.addLayout(linha_opcoes)
+        layout.addLayout(linha_acoes)
 
         self.card_historico = QFrame()
         self.card_historico.setObjectName("Card")
@@ -188,8 +198,8 @@ class SearchPautaWindow(QWidget):
         self.scroll_content.setObjectName("SearchResultsArea")
 
         self.scroll_layout = QVBoxLayout(self.scroll_content)
-        self.scroll_layout.setContentsMargins(8, 10, 8, 0)
-        self.scroll_layout.setSpacing(18)
+        self.scroll_layout.setContentsMargins(2, 10, 8, 0)
+        self.scroll_layout.setSpacing(14)
 
         self.scroll_area.setWidget(self.scroll_content)
 
@@ -204,31 +214,41 @@ class SearchPautaWindow(QWidget):
         self.btn_buscar.setText("Buscando...")
         self.btn_buscar.setEnabled(False)
 
-        palavra = self.input_palavra.text().strip()
+        try:
+            palavra = self.input_palavra.text().strip()
 
-        if salvar_no_historico and palavra:
-            salvar_busca(palavra)
+            if salvar_no_historico:
+                salvar_busca(palavra, cliente=self.input_cliente.text().strip(),
+                             data_inicial=self.input_data_inicial.text().strip(),
+                             data_final=self.input_data_final.text().strip(),
+                             somente_pautas_favoritas=self.check_somente_pautas_favoritas.isChecked(),
+                             somente_comentados=self.check_somente_comentados.isChecked(),
+                             somente_favoritos=self.check_somente_favoritos.isChecked())
 
-        data_inicial = self.input_data_inicial.text().strip()
-        data_final = self.input_data_final.text().strip()
-        candidato = self.combo_candidato.currentText()
+            resultados = buscar_pautas(
+                palavra_chave=palavra,
+                data_inicial=self.input_data_inicial.text().strip(),
+                data_final=self.input_data_final.text().strip(),
+                cliente=self.input_cliente.text().strip(),
+                somente_pautas_favoritas=self.check_somente_pautas_favoritas.isChecked()
+            )
 
-        resultados = buscar_pautas(
-            palavra_chave=palavra,
-            data_inicial=data_inicial,
-            data_final=data_final,
-            candidato=candidato,
-            somente_pautas_favoritas=self.check_somente_pautas_favoritas.isChecked()
-        )
-
-        self.carregar_resultados(resultados)
-        self.atualizar_historico()
-
-        self.btn_buscar.setText("Buscar")
-        self.btn_buscar.setEnabled(True)
+            self.carregar_resultados(resultados)
+            self.atualizar_historico()
+        except Exception as erro:
+            QMessageBox.critical(
+                self,
+                "Erro na busca",
+                f"Não foi possível concluir a busca:\n\n{erro}"
+            )
+        finally:
+            self.btn_buscar.setText("Buscar")
+            self.btn_buscar.setEnabled(True)
 
 
     def carregar_resultados(self, resultados):
+        self.media_generation = self.media_loader.nova_geracao()
+
         while self.scroll_layout.count():
             item = self.scroll_layout.takeAt(0)
             if item.widget():
@@ -256,7 +276,9 @@ class SearchPautaWindow(QWidget):
                 takes=item["takes"],
                 somente_comentados=self.check_somente_comentados.isChecked(),
                 somente_favoritos=self.check_somente_favoritos.isChecked(),
-                palavra_chave=palavra
+                palavra_chave=palavra,
+                media_loader=self.media_loader,
+                media_generation=self.media_generation
             )
 
             if card.sem_takes_visiveis:
@@ -293,7 +315,6 @@ class SearchPautaWindow(QWidget):
 
 
     def aplicar_estilo(self):
-        from theme import GLOBAL_STYLE
         self.setStyleSheet(GLOBAL_STYLE)
     
 
@@ -347,14 +368,15 @@ class SearchPautaWindow(QWidget):
             if item.widget():
                 item.widget().deleteLater()
 
-        historico = obter_historico_buscas()
+        historico = obter_historico_buscas(detalhado=True)
 
         self.btn_toggle_historico.setText(
             f"▼ Últimas buscas ({len(historico)})"
         )
 
         for termo in historico:
-            btn = QPushButton(termo)
+            btn = QPushButton(" • ".join(filter(None, [termo["termo"], termo.get("cliente")])) or "Filtros")
+            btn.setToolTip(str(termo))
             btn.setObjectName("HistoryChip")
             btn.setMaximumWidth(160)
             btn.setMinimumHeight(32)
@@ -370,8 +392,17 @@ class SearchPautaWindow(QWidget):
 
 
     def reutilizar_busca(self, termo):
-        self.input_palavra.setText(termo)
-        self.executar_busca()
+        if isinstance(termo, str):
+            termo = {"termo": termo}
+        self.input_palavra.setText(termo["termo"])
+        self.input_cliente.setText(termo.get("cliente", ""))
+        self.input_data_inicial.setText(termo.get("data_inicial", ""))
+        self.input_data_final.setText(termo.get("data_final", ""))
+        self.check_somente_comentados.setChecked(termo.get("somente_comentados", True))
+        self.check_somente_favoritos.setChecked(termo.get("somente_favoritos", False))
+        self.check_somente_pautas_favoritas.setChecked(termo.get("somente_pautas_favoritas", False))
+        self.search_timer.stop()
+        self.executar_busca(salvar_no_historico=False)
 
     def alternar_historico(self):
         aberto = self.btn_toggle_historico.isChecked()
@@ -380,11 +411,6 @@ class SearchPautaWindow(QWidget):
         self.btn_toggle_historico.setText(
             "▲ Últimas buscas" if aberto else "▼ Últimas buscas"
         )
-
-    def agendar_busca(self):
-        self.search_timer.start()
-
-
 
     def agendar_busca(self):
         self.search_timer.start()
@@ -401,7 +427,9 @@ class PautaCard(QFrame):
         takes,
         somente_comentados=True,
         somente_favoritos=False,
-        palavra_chave=""
+        palavra_chave="",
+        media_loader=None,
+        media_generation=0
     ):
         super().__init__()
 
@@ -410,6 +438,8 @@ class PautaCard(QFrame):
         self.somente_comentados = somente_comentados
         self.somente_favoritos = somente_favoritos
         self.palavra_chave = palavra_chave.lower().strip()
+        self.media_loader = media_loader
+        self.media_generation = media_generation
 
         self.takes_visiveis = []
         self.total_takes_visiveis = 0
@@ -501,7 +531,7 @@ class PautaCard(QFrame):
 
         meta = QLabel(
             f"{self.pauta['data_pauta']} • "
-            f"{self.pauta['candidato']}"
+            f"{self.pauta['cliente']}"
         )
         meta.setObjectName("PautaMeta")
 
@@ -543,6 +573,11 @@ class PautaCard(QFrame):
         linha.addWidget(self.btn_favorita_pauta)
         linha.addWidget(self.btn_editar)
         linha.addWidget(self.btn_excluir)
+        if not os.path.isdir(self.pauta.get('caminho_pasta') or ''):
+            localizar = QPushButton('Localizar')
+            localizar.setToolTip('Localizar a pasta e os arquivos desta pauta')
+            localizar.clicked.connect(lambda: open_locator(self.window(), pauta_id=self.pauta['id']))
+            linha.addWidget(localizar)
 
         self.layout.addLayout(linha)
 
@@ -604,7 +639,11 @@ class PautaCard(QFrame):
                     self.palavra_chave
                 )
 
-                row = TakeRow(take)
+                row = TakeRow(
+                    take,
+                    self.media_loader,
+                    self.media_generation
+                )
                 detalhes_layout.addWidget(row)
 
         self.detalhes_criados = True
@@ -691,11 +730,13 @@ class PautaCard(QFrame):
 
 
 class TakeRow(QFrame):
-    def __init__(self, take):
+    def __init__(self, take, media_loader, media_generation):
         super().__init__()
 
         self.take = take
-        self.media_worker = None
+        self.media_loader = media_loader
+        self.media_generation = media_generation
+        self.media_solicitada = False
 
         self.setObjectName("TakeRow")
         self.setCursor(Qt.PointingHandCursor)
@@ -946,6 +987,10 @@ class TakeRow(QFrame):
             btn_abrir
         )
         botoes_layout.addStretch()
+        if not os.path.isfile(self.take.get('caminho_arquivo') or ''):
+            localizar = QPushButton('Localizar')
+            localizar.clicked.connect(lambda: open_locator(self.window(), take_id=self.take['id']))
+            botoes_layout.addWidget(localizar)
 
         layout.addWidget(
             self.thumb_label
@@ -962,56 +1007,41 @@ class TakeRow(QFrame):
             self.abrir_popup
         )
 
-        # Toda a interface da linha já foi criada.
-        # Agora a mídia começa a carregar em segundo plano.
-        self.iniciar_carregamento_midia()
+        # A mídia só é solicitada quando a linha realmente for pintada.
 
 
     def iniciar_carregamento_midia(self):
+        if self.media_solicitada or self.media_loader is None:
+            return
+
+        self.media_solicitada = True
         caminho = self.take.get(
             "caminho_arquivo",
             ""
         )
 
-        self.media_worker = MediaWorker(
-            caminho
-        )
-
-        self.media_worker.signals.concluido.connect(
-            self.aplicar_midia
-        )
-
-        self.media_worker.signals.falhou.connect(
-            self.aplicar_erro_midia
-        )
-
-        MEDIA_THREAD_POOL.start(
-            self.media_worker
+        self.media_loader.solicitar(
+            caminho,
+            self,
+            self.media_generation
         )
 
 
-    @Slot(str, object)
+    def paintEvent(self, event):
+        self.iniciar_carregamento_midia()
+        super().paintEvent(event)
+
+
+    @Slot(object, object)
     def aplicar_midia(
         self,
-        thumb_path,
+        pixmap,
         info_video
     ):
-        if thumb_path:
-            pixmap = QPixmap(
-                thumb_path
-            )
-
+        if pixmap is not None:
             if not pixmap.isNull():
                 self.thumb_label.setText("")
-
-                self.thumb_label.setPixmap(
-                    pixmap.scaled(
-                        190,
-                        107,
-                        Qt.KeepAspectRatio,
-                        Qt.SmoothTransformation
-                    )
-                )
+                self.thumb_label.setPixmap(pixmap)
             else:
                 self.mostrar_sem_thumbnail()
         else:
@@ -1028,9 +1058,6 @@ class TakeRow(QFrame):
                 "⏱ Duração indisponível"
             )
 
-        self.media_worker = None
-
-
     @Slot(str)
     def aplicar_erro_midia(
         self,
@@ -1041,9 +1068,6 @@ class TakeRow(QFrame):
         self.detalhes_video.setText(
             "⏱ Informações indisponíveis"
         )
-
-        self.media_worker = None
-
 
     def mostrar_sem_thumbnail(self):
         self.thumb_label.clear()
@@ -1139,8 +1163,6 @@ class TakeRow(QFrame):
             termo
         )
 
-        import re
-
         padrao = re.compile(
             re.escape(
                 termo_seguro
@@ -1179,45 +1201,6 @@ class TakeRow(QFrame):
                 "O caminho deste arquivo "
                 "não existe mais."
             )
-
-
-class MediaWorkerSignals(QObject):
-    concluido = Signal(str, object)
-    falhou = Signal(str)
-
-
-class MediaWorker(QRunnable):
-    def __init__(self, caminho_arquivo):
-        super().__init__()
-
-        self.caminho_arquivo = caminho_arquivo
-        self.signals = MediaWorkerSignals()
-
-        self.setAutoDelete(True)
-
-
-    @Slot()
-    def run(self):
-        try:
-            thumb_path = gerar_thumbnail(
-                self.caminho_arquivo
-            )
-
-            info_video = obter_info_video(
-                self.caminho_arquivo
-            )
-
-            self.signals.concluido.emit(
-                thumb_path or "",
-                info_video
-            )
-
-        except Exception as erro:
-            self.signals.falhou.emit(
-                str(erro)
-            )
-
-
 
 
 class TakePopup(QDialog):
@@ -1262,27 +1245,7 @@ class TakePopup(QDialog):
         layout.addWidget(caminho)
         layout.addLayout(botoes)
         
-        self.setStyleSheet("""
-            QDialog {
-                background-color: #121212;
-                color: white;
-            }
-
-            QTextEdit {
-                background-color: #2a2a2a;
-                color: white;
-                border-radius: 8px;
-                padding: 10px;
-            }
-
-            QPushButton {
-                background-color: #2d6cdf;
-                color: white;
-                border-radius: 9px;
-                padding: 10px;
-                font-weight: bold;
-            }
-        """)
+        self.setStyleSheet(GLOBAL_STYLE)
 
     def copiar_caminho(self):
         clipboard = QGuiApplication.clipboard()
@@ -1323,13 +1286,10 @@ class EditPautaPopup(QDialog):
         self.input_data = QLineEdit()
         self.input_data.setText(pauta.get("data_pauta") or "")
 
-        self.combo_candidato = QComboBox()
-        self.combo_candidato.addItems(CANDIDATOS)
+        self.input_cliente = QLineEdit()
+        self.input_cliente.setPlaceholderText("Digite o nome do cliente")
 
-        candidato_atual = pauta.get("candidato") or ""
-        index = self.combo_candidato.findText(candidato_atual)
-        if index >= 0:
-            self.combo_candidato.setCurrentIndex(index)
+        self.input_cliente.setText(pauta.get("cliente") or "")
 
         self.input_descricao = QTextEdit()
         self.input_descricao.setText(pauta.get("descricao_inicial") or "")
@@ -1343,8 +1303,8 @@ class EditPautaPopup(QDialog):
         layout.addWidget(QLabel("Data da pauta"))
         layout.addWidget(self.input_data)
 
-        layout.addWidget(QLabel("Candidato"))
-        layout.addWidget(self.combo_candidato)
+        layout.addWidget(QLabel("Cliente"))
+        layout.addWidget(self.input_cliente)
 
         layout.addWidget(QLabel("Descrição"))
         layout.addWidget(self.input_descricao)
@@ -1411,44 +1371,17 @@ class EditPautaPopup(QDialog):
 
         layout.addWidget(btn_salvar)
 
-        self.setStyleSheet("""
-            QDialog {
-                background-color: #121212;
-                color: white;
-            }
-
-            QLineEdit, QTextEdit, QComboBox {
-                background-color: #2a2a2a;
-                color: white;
-                border: 1px solid #444;
-                border-radius: 8px;
-                padding: 10px;
-            }
-
-            QPushButton {
-                background-color: #2d6cdf;
-                color: white;
-                border-radius: 9px;
-                padding: 10px;
-                font-weight: bold;
-            }
-
-            QFrame#TakeRow {
-                background-color: #1e1e1e;
-                border-radius: 8px;
-                margin: 4px;
-            }
-
-            QScrollArea {
-                border: none;
-            }
-        """)
+        self.setStyleSheet(GLOBAL_STYLE)
 
     def salvar_alteracoes(self):
         nome = self.input_nome.text().strip()
         data = self.input_data.text().strip()
-        candidato = self.combo_candidato.currentText()
+        cliente = self.input_cliente.text().strip()
         descricao = self.input_descricao.toPlainText().strip()
+
+        if not cliente:
+            QMessageBox.warning(self, "Atenção", "Preencha o nome do cliente.")
+            return
 
         if not nome:
             QMessageBox.warning(self, "Atenção", "Preencha o nome da pauta.")
@@ -1469,7 +1402,7 @@ class EditPautaPopup(QDialog):
             pauta_id=self.pauta["id"],
             nome_pauta=nome,
             data_pauta=data,
-            candidato=candidato,
+            cliente=cliente,
             descricao=descricao,
             takes=takes_atualizados
         )

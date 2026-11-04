@@ -1,13 +1,13 @@
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
-    QTextEdit, QPushButton, QFileDialog, QComboBox,
-    QScrollArea, QFrame, QCheckBox, QMessageBox
+    QTextEdit, QPushButton, QFileDialog,
+    QScrollArea, QFrame, QCheckBox, QMessageBox, QLayout
 )
 from PySide6.QtCore import Qt
 
-from config import CANDIDATOS
 from file_scanner import listar_arquivos_midia
 from database import salvar_pauta
+from theme import GLOBAL_STYLE, SPACING
 import os
 import re
 
@@ -24,6 +24,9 @@ class CreatePautaWindow(QWidget):
         self.take_widgets = []
 
         self.main_layout = QVBoxLayout(self)
+        self.main_layout.setSizeConstraint(QLayout.SetNoConstraint)
+        self.main_layout.setContentsMargins(SPACING["xxl"], SPACING["xl"], SPACING["xxl"], SPACING["xl"])
+        self.main_layout.setSpacing(SPACING["lg"])
 
         self.criar_cabecalho()
         self.criar_formulario()
@@ -34,11 +37,10 @@ class CreatePautaWindow(QWidget):
 
     def criar_cabecalho(self):
         title = QLabel("Criar pauta")
-        title.setAlignment(Qt.AlignCenter)
-        title.setStyleSheet("font-size: 30px; font-weight: bold;")
+        title.setObjectName("PageTitle")
 
         subtitle = QLabel("Cadastre a pauta e comente apenas os takes importantes.")
-        subtitle.setAlignment(Qt.AlignCenter)
+        subtitle.setObjectName("PageSubtitle")
 
         self.main_layout.addWidget(title)
         self.main_layout.addWidget(subtitle)
@@ -48,6 +50,8 @@ class CreatePautaWindow(QWidget):
         form_box.setObjectName("Card")
 
         layout = QVBoxLayout(form_box)
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(10)
 
         self.input_nome = QLineEdit()
         self.input_nome.setPlaceholderText("Nome da pauta")
@@ -55,8 +59,8 @@ class CreatePautaWindow(QWidget):
         self.input_data = QLineEdit()
         self.input_data.setPlaceholderText("Data da pauta. Ex: 22/06/2026")
 
-        self.combo_candidato = QComboBox()
-        self.combo_candidato.addItems(CANDIDATOS)
+        self.input_cliente = QLineEdit()
+        self.input_cliente.setPlaceholderText("Digite o nome do cliente")
 
         self.input_descricao = QTextEdit()
         self.input_descricao.setPlaceholderText("Descrição inicial da pauta. Aproximadamente 150 caracteres.")
@@ -80,8 +84,8 @@ class CreatePautaWindow(QWidget):
         layout.addWidget(QLabel("Data da pauta"))
         layout.addWidget(self.input_data)
 
-        layout.addWidget(QLabel("Candidato"))
-        layout.addWidget(self.combo_candidato)
+        layout.addWidget(QLabel("Cliente"))
+        layout.addWidget(self.input_cliente)
 
         layout.addWidget(QLabel("Descrição inicial"))
         layout.addWidget(self.input_descricao)
@@ -93,15 +97,18 @@ class CreatePautaWindow(QWidget):
 
     def criar_area_arquivos(self):
         title = QLabel("Arquivos encontrados")
-        title.setStyleSheet("font-size: 22px; font-weight: bold;")
+        title.setObjectName("SectionTitle")
 
         self.label_total = QLabel("Nenhum arquivo carregado.")
+        self.label_total.setObjectName("SectionSubtitle")
 
         self.scroll_area = QScrollArea()
         self.scroll_area.setWidgetResizable(True)
 
         self.scroll_content = QWidget()
         self.scroll_layout = QVBoxLayout(self.scroll_content)
+        self.scroll_layout.setContentsMargins(0, 8, 0, 0)
+        self.scroll_layout.setSpacing(10)
 
         self.scroll_area.setWidget(self.scroll_content)
 
@@ -111,7 +118,7 @@ class CreatePautaWindow(QWidget):
 
     def criar_botao_salvar(self):
         self.btn_salvar = QPushButton("Salvar pauta")
-        self.btn_salvar.setMinimumHeight(55)
+        self.btn_salvar.setMinimumHeight(48)
         self.btn_salvar.clicked.connect(self.salvar)
 
         self.main_layout.addWidget(self.btn_salvar)
@@ -177,8 +184,12 @@ class CreatePautaWindow(QWidget):
     def salvar(self):
         nome = self.input_nome.text().strip()
         data = self.input_data.text().strip()
-        candidato = self.combo_candidato.currentText()
+        cliente = self.input_cliente.text().strip()
         descricao = self.input_descricao.toPlainText().strip()
+
+        if not cliente:
+            QMessageBox.warning(self, "Atenção", "Preencha o nome do cliente.")
+            return
 
         if not nome:
             QMessageBox.warning(self, "Atenção", "Preencha o nome da pauta.")
@@ -206,7 +217,7 @@ class CreatePautaWindow(QWidget):
         salvar_pauta(
             nome_pauta=nome,
             data_pauta=data,
-            candidato=candidato,
+            cliente=cliente,
             descricao=descricao,
             caminho_pasta=self.caminho_pasta,
             takes=takes
@@ -255,5 +266,4 @@ class CreatePautaWindow(QWidget):
                 self.input_descricao.setPlainText(descricao)
 
     def aplicar_estilo(self):
-        from theme import GLOBAL_STYLE
         self.setStyleSheet(GLOBAL_STYLE)

@@ -18,18 +18,20 @@ def display_pauta(p):
     return p
 def home(cliente="",periodo="Todos",status="Todos"):
     return [display_pauta(p) for p in listar_pautas_acervo(cliente,periodo,status)]
-def search(term="",date_from="",date_to="",owner="",favorite_pautas=False):
-    return [{"pauta":display_pauta(x["pauta"]),"takes":x["takes"]} for x in buscar_pautas(term,date_from,date_to,owner,favorite_pautas)]
+def search(term="",date_from="",date_to="",owner="",favorite_pautas=False,offset=0,limite=None):
+    result=buscar_pautas(term,date_from,date_to,owner,favorite_pautas,limite=limite,offset=offset)
+    from network.client import Page
+    return Page([{"pauta":display_pauta(x["pauta"]),"takes":x["takes"]} for x in result],getattr(result,'has_more',False))
 def detail(pauta_id):
     data=obter_pauta_com_takes(pauta_id)
     if data: data["pauta"]=display_pauta(data["pauta"])
     return data
 def create(**values): return salvar_pauta(**values)
 def update(**values): return atualizar_pauta(**values)
-def delete(pauta_id): return excluir_pauta(pauta_id)
-def set_status(pauta_id,label): return atualizar_status_pauta(pauta_id,STATUS_VALUE[label])
-def favorite_take(take_id,on): return alternar_favorito_take(take_id,on)
-def favorite_pauta(pauta_id,on): return alternar_favorito_pauta(pauta_id,on)
+def delete(pauta_id,**kw): return excluir_pauta(pauta_id,**kw)
+def set_status(pauta_id,label,**kw): return atualizar_status_pauta(pauta_id,STATUS_VALUE[label],**kw)
+def favorite_take(take_id,on,**kw): return alternar_favorito_take(take_id,on,**kw)
+def favorite_pauta(pauta_id,on,**kw): return alternar_favorito_pauta(pauta_id,on,**kw)
 def scan(folder): return listar_arquivos_midia(folder)
 def history(limit=8): return obter_historico_buscas(limit, detalhado=True)
 def save_search(term, **filters): return salvar_busca(term, **filters)

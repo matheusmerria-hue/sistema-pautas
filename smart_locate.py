@@ -160,6 +160,8 @@ def mappings():
 
 
 def invalidate_mappings(ids=None):
+    from network import runtime
+    if runtime.remote():return runtime.SESSION.http('POST','/locate-forget',{})
     with closing(get_connection()) as conn, conn:
         if ids is None: conn.execute('UPDATE locate_mappings SET active=0')
         else: conn.executemany('UPDATE locate_mappings SET active=0 WHERE id=?', [(i,) for i in ids])
@@ -168,7 +170,8 @@ def invalidate_mappings(ids=None):
 class Locator:
     """Um worker sequencial. Índice somente dos alvos e até 32 opções por vínculo."""
     def __init__(self, root, cancel=None, progress=None, pauta_id=None, take_id=None, metadata_workers=1):
-        self.root = os.path.realpath(os.path.abspath(root))
+        from network import runtime
+        self.root = root if runtime.remote() else os.path.realpath(os.path.abspath(root))
         self.cancel = cancel or threading.Event()
         self.progress = progress or (lambda stats: None)
         self.pauta_id = pauta_id; self.take_id = take_id
@@ -265,6 +268,10 @@ class Locator:
         self.tick()
 
     def run(self):
+        from network import runtime
+        if runtime.remote():
+            from network.client import locate
+            return locate(self.root,self.cancel,self.progress,self.pauta_id,self.take_id,self.metadata_workers)
         pool=ThreadPoolExecutor(max_workers=self.metadata_workers) if self.metadata_workers>1 else nullcontext()
         with pool as executor:
             self._executor=executor
@@ -377,6 +384,11 @@ def derive_mapping(old,new):
 
 def apply_updates(result, selections, cancel=None):
     """Seleções explícitas key->path. Tudo ou nada, com controle de concorrência."""
+    from network import runtime
+    if runtime.remote():
+        if cancel and cancel.is_set():raise ValueError('Atualização cancelada.')
+        response=runtime.SESSION.http('POST','/locate/'+result.job_id+'/apply',dict(selections=[dict(kind=k[0],id=k[1],path=p) for k,p in selections.items()]))
+        return response['batch']
     if not selections:raise ValueError('Selecione pelo menos um vínculo para atualizar.')
     batch=uuid.uuid4().hex; targets={t.key:t for t in result.targets}
     folder_selections={targets[key].pauta_id for key in selections if targets[key].kind=='pauta'}
@@ -410,12 +422,16 @@ def apply_updates(result, selections, cancel=None):
 
 
 def last_batch():
+    from network import runtime
+    if runtime.remote():return 'latest-on-server'
     with closing(get_connection()) as conn:
         row=conn.execute('SELECT id FROM locate_batches WHERE undone=0 ORDER BY created DESC LIMIT 1').fetchone()
         return row[0] if row else None
 
 
 def undo_batch(batch, cancel=None):
+    from network import runtime
+    if runtime.remote():return runtime.SESSION.http('POST','/locate-undo',{})['count']
     with closing(get_connection()) as conn, conn:
         conn.execute('BEGIN IMMEDIATE')
         row=conn.execute('SELECT undone FROM locate_batches WHERE id=?',(batch,)).fetchone()

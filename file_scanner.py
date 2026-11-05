@@ -3,6 +3,8 @@ from config import EXTENSOES_VALIDAS
 
 
 def listar_arquivos_midia(caminho_pasta):
+    from network import runtime
+    if runtime.remote():return runtime.SESSION.rpc('scan_media',dict(caminho_pasta=caminho_pasta))
     pasta = Path(caminho_pasta)
 
     if not pasta.exists() or not pasta.is_dir():

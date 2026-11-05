@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (
 )
 from database import (
     buscar_pautas,
+    obter_pauta_com_takes,
     excluir_pauta,
     atualizar_pauta,
     alternar_favorito_take,
@@ -33,6 +34,8 @@ from media_loader import MediaLoader
 from theme import GLOBAL_STYLE, SPACING
 from ui.client_search import ClientSearchInput
 from ui.ui_locate import open_locator, allow_close
+from network.runtime import expected,remote
+from network.desktop import operation_errors,saving_form,serial_refresh
 
 class SearchPautaWindow(QWidget):
     def __init__(self):
@@ -46,6 +49,7 @@ class SearchPautaWindow(QWidget):
         self.main_layout.setContentsMargins(SPACING["xxl"], SPACING["xl"], SPACING["xxl"], SPACING["xl"])
         self.main_layout.setSpacing(SPACING["md"])
         self.resultados_exportaveis = []
+        self.page_offset = 0
         self.media_loader = MediaLoader(self)
         self.media_generation = self.media_loader.generation
         self.search_timer = QTimer(self)
@@ -60,6 +64,8 @@ class SearchPautaWindow(QWidget):
         self.atualizar_historico()
 
     def closeEvent(self, event):
+        from network.desktop import allow_network_close
+        if not allow_network_close(self,event):return
         if not allow_close(self,event): return
         self.media_loader.encerrar()
         super().closeEvent(event)
@@ -122,7 +128,7 @@ class SearchPautaWindow(QWidget):
         self.check_somente_pautas_favoritas.stateChanged.connect(self.agendar_busca)
 
         self.btn_buscar = QPushButton("Buscar")
-        self.btn_buscar.clicked.connect(lambda: self.executar_busca())
+        self.btn_buscar.clicked.connect(self.buscar_inicio)
 
         self.btn_exportar_resultado = QPushButton("Exportar resultado")
         self.btn_exportar_resultado.setObjectName("SecondaryButton")
@@ -140,6 +146,12 @@ class SearchPautaWindow(QWidget):
         self.btn_localizar = QPushButton("Localizar arquivos perdidos")
         self.btn_localizar.clicked.connect(lambda: open_locator(self))
         linha_acoes.addWidget(self.btn_localizar)
+        from network.runtime import remote
+        self.previous_page=QPushButton('Página anterior'); self.next_page=QPushButton('Próxima página')
+        self.previous_page.clicked.connect(lambda:self.change_page(-100)); self.next_page.clicked.connect(lambda:self.change_page(100))
+        self.previous_page.setVisible(remote()); self.next_page.setVisible(remote())
+        self.previous_page.setEnabled(False); self.next_page.setEnabled(False)
+        linha_acoes.addWidget(self.previous_page); linha_acoes.addWidget(self.next_page)
 
         layout.addLayout(linha_1)
         layout.addLayout(linha_2)
@@ -210,6 +222,7 @@ class SearchPautaWindow(QWidget):
         self.main_layout.addWidget(self.scroll_area)
 
 
+    @serial_refresh('search_timer')
     def executar_busca(self, salvar_no_historico=True):
         self.btn_buscar.setText("Buscando...")
         self.btn_buscar.setEnabled(False)
@@ -231,9 +244,12 @@ class SearchPautaWindow(QWidget):
                 data_final=self.input_data_final.text().strip(),
                 cliente=self.input_cliente.text().strip(),
                 somente_pautas_favoritas=self.check_somente_pautas_favoritas.isChecked()
+                ,offset=self.page_offset
             )
 
             self.carregar_resultados(resultados)
+            self.previous_page.setEnabled(self.page_offset>0)
+            self.next_page.setEnabled(getattr(resultados,'has_more',False))
             self.atualizar_historico()
         except Exception as erro:
             QMessageBox.critical(
@@ -338,6 +354,12 @@ class SearchPautaWindow(QWidget):
             return
 
         try:
+            if remote():
+                from network.exporting import filtered_results
+                self.resultados_exportaveis=filtered_results(dict(palavra_chave=self.input_palavra.text().strip(),
+                    cliente=self.input_cliente.text().strip(),data_inicial=self.input_data_inicial.text().strip(),
+                    data_final=self.input_data_final.text().strip(),somente_pautas_favoritas=self.check_somente_pautas_favoritas.isChecked()),
+                    self.check_somente_comentados.isChecked(),self.check_somente_favoritos.isChecked(),True)
             if caminho_saida.lower().endswith(".json"):
                 exportar_resultados_json(caminho_saida, self.resultados_exportaveis)
 
@@ -392,6 +414,7 @@ class SearchPautaWindow(QWidget):
 
 
     def reutilizar_busca(self, termo):
+        self.page_offset=0
         if isinstance(termo, str):
             termo = {"termo": termo}
         self.input_palavra.setText(termo["termo"])
@@ -413,7 +436,16 @@ class SearchPautaWindow(QWidget):
         )
 
     def agendar_busca(self):
+        self.page_offset=0
         self.search_timer.start()
+
+    def change_page(self,delta):
+        self.page_offset=max(0,self.page_offset+delta)
+        self.executar_busca(salvar_no_historico=False)
+
+    def buscar_inicio(self):
+        self.page_offset=0
+        self.executar_busca()
 
 
     def executar_busca_instantanea(self):
@@ -573,7 +605,7 @@ class PautaCard(QFrame):
         linha.addWidget(self.btn_favorita_pauta)
         linha.addWidget(self.btn_editar)
         linha.addWidget(self.btn_excluir)
-        if not os.path.isdir(self.pauta.get('caminho_pasta') or ''):
+        if remote() or not os.path.isdir(self.pauta.get('caminho_pasta') or ''):
             localizar = QPushButton('Localizar')
             localizar.setToolTip('Localizar a pasta e os arquivos desta pauta')
             localizar.clicked.connect(lambda: open_locator(self.window(), pauta_id=self.pauta['id']))
@@ -649,6 +681,7 @@ class PautaCard(QFrame):
         self.detalhes_criados = True
 
 
+    @operation_errors
     def alternar_favorita_pauta(self):
         favorita_atual = (
             int(self.pauta.get("favorita") or 0) == 1
@@ -657,7 +690,8 @@ class PautaCard(QFrame):
 
         alternar_favorito_pauta(
             self.pauta["id"],
-            nova_favorita
+            nova_favorita,
+            _expected=expected(pauta=self.pauta)
         )
 
         self.pauta["favorita"] = (
@@ -692,13 +726,18 @@ class PautaCard(QFrame):
             self.alternar_expandir()
 
 
+    @operation_errors
     def abrir_edicao(self):
+        detail=obter_pauta_com_takes(self.pauta['id'])
+        if not detail:return
         popup = EditPautaPopup(
-            self.pauta,
-            self.takes
+            detail['pauta'],
+            detail['takes']
         )
 
         if popup.exec():
+            detail=obter_pauta_com_takes(self.pauta['id'])
+            if detail:self.pauta=detail['pauta']; self.takes=detail['takes']
             QMessageBox.information(
                 self,
                 "Atualizado",
@@ -708,6 +747,7 @@ class PautaCard(QFrame):
             )
 
 
+    @operation_errors
     def confirmar_exclusao(self):
         resposta = QMessageBox.question(
             self,
@@ -722,7 +762,7 @@ class PautaCard(QFrame):
             return
 
         excluir_pauta(
-            self.pauta["id"]
+            self.pauta["id"], _expected=expected(pauta=self.pauta)
         )
 
         self.setParent(None)
@@ -987,7 +1027,7 @@ class TakeRow(QFrame):
             btn_abrir
         )
         botoes_layout.addStretch()
-        if not os.path.isfile(self.take.get('caminho_arquivo') or ''):
+        if remote() or not os.path.isfile(self.take.get('caminho_arquivo') or ''):
             localizar = QPushButton('Localizar')
             localizar.clicked.connect(lambda: open_locator(self.window(), take_id=self.take['id']))
             botoes_layout.addWidget(localizar)
@@ -1079,6 +1119,7 @@ class TakeRow(QFrame):
         )
 
 
+    @operation_errors
     def alternar_favorito(self):
         favorito_atual = (
             int(
@@ -1093,7 +1134,7 @@ class TakeRow(QFrame):
 
         alternar_favorito_take(
             self.take["id"],
-            novo_favorito
+            novo_favorito, _expected=expected(takes=[self.take])
         )
 
         self.take["favorito"] = (
@@ -1373,6 +1414,7 @@ class EditPautaPopup(QDialog):
 
         self.setStyleSheet(GLOBAL_STYLE)
 
+    @saving_form
     def salvar_alteracoes(self):
         nome = self.input_nome.text().strip()
         data = self.input_data.text().strip()
@@ -1398,14 +1440,20 @@ class EditPautaPopup(QDialog):
                 "status_take": item["status_widget"].currentText()
             })
 
-        atualizar_pauta(
-            pauta_id=self.pauta["id"],
-            nome_pauta=nome,
-            data_pauta=data,
-            cliente=cliente,
-            descricao=descricao,
-            takes=takes_atualizados
-        )
+        try:
+            atualizar_pauta(
+                pauta_id=self.pauta["id"],
+                nome_pauta=nome,
+                data_pauta=data,
+                cliente=cliente,
+                descricao=descricao,
+                takes=takes_atualizados
+                ,_expected=expected(pauta=self.pauta,takes=self.takes)
+            )
+
+        except Exception as error:
+            QMessageBox.warning(self, "Não foi possível salvar", str(error))
+            return
 
         self.accept()
 

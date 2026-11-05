@@ -10,6 +10,11 @@ from smart_locate import Locator, apply_updates, undo_batch, last_batch, invalid
 from user_config import MODO
 
 
+def editing_allowed():
+    from network import runtime
+    return runtime.SESSION.role in ('editor','admin') and runtime.SESSION.online if runtime.remote() else MODO=='ADMIN'
+
+
 class LocateWorker(QThread):
     progress = Signal(dict)
     done = Signal(object)
@@ -66,6 +71,15 @@ class LocateDialog(QDialog):
         self.set_busy(False)
 
     def choose_root(self):
+        from network import runtime
+        if runtime.remote():
+            from network.client import responsive
+            from PySide6.QtWidgets import QInputDialog
+            roots=responsive(lambda:runtime.SESSION.http('GET','/media-roots'))
+            choices=[r['share'] for r in roots]
+            path,ok=QInputDialog.getItem(self,'HDs do servidor','Raiz de mídia autorizada:',choices,0,False)
+            if ok:self.root.setText(path)
+            return
         path=QFileDialog.getExistingDirectory(self,'Escolher unidade ou pasta raiz',self.root.text())
         if path:self.root.setText(path)
 
@@ -84,7 +98,7 @@ class LocateDialog(QDialog):
         self.cancel.setEnabled(busy); self.progress.setRange(0,0 if busy else 1)
         if not busy:self.progress.setValue(1)
         self.cancel.setText('Cancelar operação')
-        if MODO!='ADMIN':
+        if not editing_allowed():
             for w in [self.apply,self.undo,self.forget]:w.setEnabled(False)
 
     def scan(self):
@@ -101,6 +115,10 @@ class LocateDialog(QDialog):
             f"Arquivos pendentes: {s['pending']} • Encontrados: {s['found']} • Não encontrados: {s['missing']} • Ambíguos: {s['ambiguous']}\n"
             f"Diretórios examinados: {s['directories']} • Erros de acesso: {s['errors']} • Tempo: {s['elapsed']:.1f}s • "
             f"Pautas localizadas integralmente: {s['complete_pautas']} • Parcialmente: {s['partial_pautas']}")
+        if s.get('job_id'):
+            states={'queued':'na fila','running':'em execução','cancelling':'cancelando','cancelled':'cancelada','completed':'concluída','failed':'falhou'}
+            state=states.get(s.get('job_status'),s.get('job_status') or '')
+            self.summary.setText(self.summary.text()+f"\nTarefa: {s['job_id']} • Estado: {state}")
 
     def scan_complete(self,result):
         self.result=result
@@ -151,10 +169,10 @@ class LocateDialog(QDialog):
 
     def update_selection_count(self):
         self.page_info.setText(f'de {self.page.maximum()} • {len(self.selections)} vínculos selecionados')
-        self.apply.setEnabled(bool(self.selections) and MODO=='ADMIN')
+        self.apply.setEnabled(bool(self.selections) and editing_allowed())
 
     def confirm_apply(self):
-        if MODO!='ADMIN':return
+        if not editing_allowed():return
         if not self.result or not self.selections:return
         if QMessageBox.question(self,'Atualizar referências?',f'Atualizar {len(self.selections)} vínculos selecionados? Os caminhos anteriores serão guardados para desfazer.')!=QMessageBox.Yes:return
         result=self.result; selections=dict(self.selections)
@@ -165,7 +183,7 @@ class LocateDialog(QDialog):
         QMessageBox.information(self,'Localização','Referências atualizadas. Você pode desfazer pela mesma janela. Faça a busca novamente para recarregar os resultados do acervo.')
 
     def confirm_undo(self):
-        if MODO!='ADMIN':return
+        if not editing_allowed():return
         if QMessageBox.question(self,'Desfazer localização?','Restaurar os caminhos anteriores do último lote? Os arquivos físicos não serão modificados.')!=QMessageBox.Yes:return
         def operation(cancel,progress):
             batch=last_batch()
@@ -177,7 +195,7 @@ class LocateDialog(QDialog):
         self.updated.emit(); QMessageBox.information(self,'Localização',f'{count} vínculos restaurados.')
 
     def forget_maps(self):
-        if MODO!='ADMIN':return
+        if not editing_allowed():return
         if QMessageBox.question(self,'Invalidar mapeamentos?','Deixar de reutilizar todos os prefixos conhecidos nas próximas buscas?')==QMessageBox.Yes:
             self.run_operation(lambda cancel,progress:invalidate_mappings(),lambda _:QMessageBox.information(self,'Localização','Mapeamentos invalidados.'))
 

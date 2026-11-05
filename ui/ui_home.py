@@ -17,10 +17,12 @@ from ui.ui_create import CreatePautaWindow
 from ui.ui_search import SearchPautaWindow
 from user_config import MODO
 from theme import GLOBAL_STYLE, APP_VERSION, APP_SUBTITLE, APP_TEAM
-from database import listar_pautas_acervo, atualizar_status_pauta
+from database import listar_pautas_acervo, atualizar_status_pauta,obter_estatisticas
 from PySide6.QtGui import QIcon
 from ui.client_search import ClientSearchInput
 from ui.ui_locate import open_locator, allow_close
+from network.runtime import expected,remote
+from network.desktop import operation_errors
 import os
 
 
@@ -31,6 +33,7 @@ class HomeWindow(QMainWindow):
         super().__init__()
 
         self.filtro_acervo_atual = ""
+        self.acervo_offset = 0
         self.filtro_status_acervo = "Todos"
         self.filtro_periodo_acervo = "Todos"
         self.setWindowTitle("Sistema de Pautas Audiovisuais")
@@ -182,11 +185,17 @@ class HomeWindow(QMainWindow):
             cliente=self.filtro_acervo_atual,
             periodo=self.filtro_periodo_acervo,
             status=self.filtro_status_acervo
+            ,offset=self.acervo_offset
         )
 
         total_a_editar = len([p for p in pautas if (p.get("status_pauta") or "a_editar") == "a_editar"])
         total_em_producao = len([p for p in pautas if (p.get("status_pauta") or "") == "em_producao"])
         total_finalizadas = len([p for p in pautas if (p.get("status_pauta") or "") == "finalizada"])
+        if remote():
+            counts=obter_estatisticas(self.filtro_acervo_atual,self.filtro_periodo_acervo,self.filtro_status_acervo)
+            total_a_editar=counts['status_counts'].get('a_editar',0)
+            total_em_producao=counts['status_counts'].get('em_producao',0)
+            total_finalizadas=counts['status_counts'].get('finalizada',0)
 
         status_row = QHBoxLayout()
         status_row.setSpacing(12)
@@ -266,6 +275,7 @@ class HomeWindow(QMainWindow):
         lista_titulo.setObjectName("SectionTitle")
 
         lista_total = QLabel(f"{len(pautas)} pauta(s) encontradas")
+        if remote():lista_total.setText(f"{len(pautas)} nesta página • {counts['total_pautas']} encontradas")
         lista_total.setStyleSheet("color: #94A3B8; font-size: 14px;")
 
         lista_header.addWidget(lista_titulo)
@@ -298,11 +308,17 @@ class HomeWindow(QMainWindow):
         scroll.setWidget(scroll_content)
 
         lista_layout.addWidget(scroll)
+        if remote():
+            page_row=QHBoxLayout(); previous=QPushButton('Página anterior'); following=QPushButton('Próxima página')
+            previous.setEnabled(self.acervo_offset>0); following.setEnabled(getattr(pautas,'has_more',False))
+            previous.clicked.connect(lambda:self.change_acervo_page(-100)); following.clicked.connect(lambda:self.change_acervo_page(100))
+            page_row.addWidget(previous); page_row.addWidget(following); lista_layout.addLayout(page_row)
 
         layout.addWidget(lista_card, stretch=1)
 
         return content
 
+    @operation_errors
     def alternar_status_pauta(self, pauta):
         status_atual = pauta.get("status_pauta") or "a_editar"
 
@@ -314,12 +330,16 @@ class HomeWindow(QMainWindow):
 
         novo_status = proximo_status.get(status_atual, "a_editar")
 
-        atualizar_status_pauta(pauta["id"], novo_status)
+        atualizar_status_pauta(pauta["id"], novo_status, _expected=expected(pauta=pauta))
 
         self.dashboard_page.deleteLater()
         self.dashboard_page = self.criar_dashboard_page()
         self.pages.insertWidget(0, self.dashboard_page)
         self.pages.setCurrentWidget(self.dashboard_page)
+
+    def change_acervo_page(self,delta):
+        self.acervo_offset=max(0,self.acervo_offset+delta)
+        self.mostrar_dashboard()
 
     def criar_card_stat(self, titulo, valor):
         card = QFrame()
@@ -369,6 +389,7 @@ class HomeWindow(QMainWindow):
 
     def mostrar_busca(self):
         self.pages.setCurrentWidget(self.search_page)
+        if remote():self.search_page.executar_busca(False)
 
     def alternar_sidebar(self):
         self.sidebar_aberta = not self.sidebar_aberta
@@ -450,6 +471,7 @@ class HomeWindow(QMainWindow):
 
 
     def selecionar_filtro_acervo(self, tipo, valor):
+        self.acervo_offset=0
         if tipo == "status":
             self.filtro_status_acervo = valor
 
@@ -510,7 +532,7 @@ class HomeWindow(QMainWindow):
 
         layout.addWidget(status_label)
         layout.addLayout(info, stretch=1)
-        if not os.path.isdir(pauta.get('caminho_pasta') or ''):
+        if remote() or not os.path.isdir(pauta.get('caminho_pasta') or ''):
             localizar = QPushButton('Localizar')
             localizar.clicked.connect(lambda: open_locator(self,pauta_id=pauta['id']))
             layout.addWidget(localizar)
@@ -518,6 +540,8 @@ class HomeWindow(QMainWindow):
         return item
 
     def closeEvent(self,event):
+        from network.desktop import allow_network_close
+        if not allow_network_close(self,event):return
         if not allow_close(self,event):return
         self.search_page.media_loader.encerrar()
         super().closeEvent(event)

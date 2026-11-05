@@ -7,6 +7,7 @@ from PySide6.QtCore import Qt
 
 from file_scanner import listar_arquivos_midia
 from database import salvar_pauta
+from network.desktop import saving_form
 from theme import GLOBAL_STYLE, SPACING
 import os
 import re
@@ -181,6 +182,7 @@ class CreatePautaWindow(QWidget):
 
         self.scroll_layout.addStretch()
 
+    @saving_form
     def salvar(self):
         nome = self.input_nome.text().strip()
         data = self.input_data.text().strip()
@@ -214,14 +216,19 @@ class CreatePautaWindow(QWidget):
                 "importante": importante
             })
 
-        salvar_pauta(
-            nome_pauta=nome,
-            data_pauta=data,
-            cliente=cliente,
-            descricao=descricao,
-            caminho_pasta=self.caminho_pasta,
-            takes=takes
-        )
+        try:
+            salvar_pauta(
+                nome_pauta=nome,
+                data_pauta=data,
+                cliente=cliente,
+                descricao=descricao,
+                caminho_pasta=self.caminho_pasta,
+                takes=takes
+            )
+
+        except Exception as error:
+            QMessageBox.warning(self, "Não foi possível salvar", str(error))
+            return
 
         QMessageBox.information(self, "Sucesso", "Pauta salva com sucesso!")
 

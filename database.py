@@ -21,8 +21,18 @@ def get_connection():
     ela será criada automaticamente.
     """
 
+    from network import runtime
+    if runtime.remote():raise RuntimeError('O cliente de rede não pode abrir um banco SQLite local.')
+    if runtime.CONNECTION.get() is not None:return runtime.CONNECTION.get()
+    if str(DB_PATH).startswith('\\\\'):raise ValueError('O banco SQLite deve ficar em disco local, não em compartilhamento UNC.')
+    import os
+    if os.name=='nt':
+        import ctypes
+        if ctypes.windll.kernel32.GetDriveTypeW(str(DB_PATH.anchor))==4:
+            raise ValueError('O SQLite não pode ficar em unidade de rede mapeada.')
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=10)
+    conn.execute('PRAGMA busy_timeout=10000')
     conn.create_function("normalizar", 1, normalizar, deterministic=True)
     return conn
 
@@ -250,7 +260,7 @@ def salvar_pauta(nome_pauta, data_pauta, cliente="", descricao="", caminho_pasta
 
 
 @compat_cliente
-def listar_pautas_acervo(cliente="", periodo="Todos", status="Todos"):
+def listar_pautas_acervo(cliente="", periodo="Todos", status="Todos", limite=None, offset=0):
     conn = get_connection()
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
@@ -302,6 +312,8 @@ def listar_pautas_acervo(cliente="", periodo="Todos", status="Todos"):
         ORDER BY {data_sql} DESC, id DESC
     """
 
+    if limite is not None:
+        query += ' LIMIT ? OFFSET ?'; params.extend([int(limite),int(offset)])
     cursor.execute(query, params)
     pautas = [dict(row) for row in cursor.fetchall()]
 
@@ -317,7 +329,8 @@ def buscar_pautas(
     data_inicial="",
     data_final="",
     cliente="",
-    somente_pautas_favoritas=False
+    somente_pautas_favoritas=False,
+    limite=None, offset=0
 ):
     """
     Busca pautas no banco.
@@ -377,6 +390,9 @@ def buscar_pautas(
         params.append(normalizar(cliente))
 
     query += " ORDER BY p.data_pauta DESC, p.id DESC"
+
+    if limite is not None:
+        query += ' LIMIT ? OFFSET ?'; params.extend([int(limite),int(offset)])
 
     cursor.execute(query, params)
     pautas = cursor.fetchall()
@@ -506,7 +522,7 @@ def obter_pauta_com_takes(pauta_id):
 # ==========================================================
 
 @compat_cliente
-def atualizar_pauta(pauta_id, nome_pauta, data_pauta, cliente="", descricao="", takes=()):
+def atualizar_pauta(pauta_id, nome_pauta, data_pauta, cliente="", descricao="", takes=(), status_pauta=None):
     conn = get_connection()
     cliente = resolver_cliente(conn, cliente)
     cursor = conn.cursor()
@@ -532,19 +548,23 @@ def atualizar_pauta(pauta_id, nome_pauta, data_pauta, cliente="", descricao="", 
     ))
 
     # Atualiza os takes vinculados
+    if status_pauta is not None:
+        cursor.execute('UPDATE pautas SET status_pauta=? WHERE id=?',(status_pauta,pauta_id))
     for take in takes:
         cursor.execute("""
             UPDATE takes
             SET comentario = ?,
                 tags = ?,
                 marcado_como_importante = ?,
-                status_take = ?
+                status_take = ?,
+                favorito = COALESCE(?, favorito)
             WHERE id = ? AND pauta_id = ?
         """, (
             take["comentario"],
             take.get("tags", ""),
             1 if take["importante"] else 0,
             take.get("status_take", "talvez"),
+            int(bool(take['favorito'])) if 'favorito' in take else None,
             take["id"], pauta_id
         ))
 
@@ -557,7 +577,7 @@ def atualizar_pauta(pauta_id, nome_pauta, data_pauta, cliente="", descricao="", 
 # ==========================================================
 
 @compat_cliente
-def obter_estatisticas(cliente=""):
+def obter_estatisticas(cliente="",periodo="Todos",status="Todos"):
     conn = get_connection()
     cursor = conn.cursor()
 
@@ -567,6 +587,14 @@ def obter_estatisticas(cliente=""):
     if normalizar(cliente):
         filtro += " AND instr(normalizar(p.cliente), ?) > 0"
         params.append(normalizar(cliente))
+
+    date_expression="CASE WHEN p.data_pauta LIKE '__/__/____' THEN substr(p.data_pauta,7,4)||'-'||substr(p.data_pauta,4,2)||'-'||substr(p.data_pauta,1,2) ELSE p.data_pauta END"
+    if periodo=='Hoje':filtro+=f" AND date({date_expression})=date('now')"
+    elif periodo in ('7 dias','30 dias'):
+        filtro+=f" AND date({date_expression})>=date('now', ?)";params.append('-7 days' if periodo=='7 dias' else '-30 days')
+    if status!='Todos':filtro+=" AND IFNULL(p.status_pauta,'a_editar')=?";params.append(status)
+    cursor.execute(f"SELECT IFNULL(p.status_pauta,'a_editar'), COUNT(*) FROM pautas p {filtro} GROUP BY IFNULL(p.status_pauta,'a_editar')",params)
+    status_counts=dict(cursor.fetchall())
 
     cursor.execute(f"""
         SELECT COUNT(*)
@@ -621,6 +649,7 @@ def obter_estatisticas(cliente=""):
 
     return {
         "total_pautas": total_pautas,
+        "status_counts": status_counts,
         "total_takes": total_takes,
         "takes_comentados": takes_comentados,
         "pautas_por_cliente": pautas_por_cliente,
@@ -793,6 +822,15 @@ def alternar_favorito_pauta(pauta_id, favorita):
 
     conn.commit()
     conn.close()
+
+
+# A mesma API Python atende o modo local e o cliente LAN, sem SQL no cliente.
+from network.runtime import route as _network_route
+for _name in ('init_database','listar_clientes','salvar_pauta','listar_pautas_acervo',
+              'buscar_pautas','atualizar_status_pauta','excluir_pauta','obter_pauta_com_takes',
+              'atualizar_pauta','obter_estatisticas','alternar_favorito_take','salvar_busca',
+              'obter_historico_buscas','obter_top_palavras','alternar_favorito_pauta'):
+    globals()[_name]=_network_route(globals()[_name])
 
 
 

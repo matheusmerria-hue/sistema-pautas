@@ -25,6 +25,15 @@ resultado_busca.json
 *.sqlite3-*
 *.log
 /.venv/
+/.venv-network/
+/network.local/
+/release-network/
+/build-network/
+/packaging/generated/
+*.server.lock
+server.json
+users.json
+connection.json
 /venv/
 .pytest_cache/
 .coverage

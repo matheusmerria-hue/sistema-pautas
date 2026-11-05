@@ -43,12 +43,18 @@ class Workstation(QMainWindow):
     def open_palette(self):
         center=self.geometry().center(); self.palette.move(center.x()-self.palette.width()//2,center.y()-self.palette.height()//2); self.palette.exec()
     def closeEvent(self,event):
+        from network.desktop import allow_network_close
+        if not allow_network_close(self,event):return
         if not allow_close(self,event):return
         self.media_loader.encerrar(); self.media_loader.pool.waitForDone(6500); super().closeEvent(event)
 
-def main():
+def main(network=False):
     logging.basicConfig(level=logging.INFO,format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    app=QApplication.instance() or QApplication(sys.argv)
+    from network.desktop import connect,load_settings,install_monitor
+    if network or load_settings().get('network'):
+        if not connect():return 1
     try: backend.initialize()
     except Exception: logging.exception("Falha ao inicializar banco"); raise
-    app=QApplication.instance() or QApplication(sys.argv); app.setApplicationName("Pautas V3"); app.setStyle("Fusion"); app.setFont(QFont("Segoe UI",9)); app.setStyleSheet(QSS); window=Workstation(); window.show(); return app.exec()
+    app.setApplicationName("Pautas V3"); app.setStyle("Fusion"); app.setFont(QFont("Segoe UI",9)); app.setStyleSheet(QSS); window=Workstation(); install_monitor(window); window.show(); return app.exec()
 if __name__=="__main__": raise SystemExit(main())
